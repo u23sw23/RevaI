@@ -1,9 +1,9 @@
 <template>
   <div class="exam-page">
     <!-- Exam list (similar to repositories cards) -->
-    <div v-if="!selectedExam" class="paper-list">
+    <div v-if="!selectedNote" class="paper-list">
       <h2 class="page-title">Select exam / note</h2>
-      <p class="page-subtitle">Each note has one exam. Choose an exam to start answering.</p>
+      <p class="page-subtitle">Choose a note to view or generate exams.</p>
 
       <div class="papers-grid">
         <div
@@ -25,19 +25,160 @@
     <!-- Exam detail -->
     <div v-else class="exam-detail">
       <div class="exam-header">
-        <div class="exam-info">
+        <div class="exam-info-left">
           <button class="back-btn" @click="backToList">Back to exam list</button>
-          <div class="exam-title">{{ selectedExam.title }}</div>
+          <div class="exam-title">
+            {{ selectedNote.title }}
+            <span v-if="selectedExam">- {{ selectedExam.name }}</span>
+          </div>
+          <div class="exam-sub-row">
+            <div v-if="Object.keys(currentNoteExams || {}).length" class="exam-switcher">
+              <label class="exam-switcher-label">Test set:</label>
+              <select class="exam-switcher-select" v-model="selectedExamId" @change="onChangeExam">
+                <option
+                  v-for="exam in Object.values(currentNoteExams).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))"
+                  :key="exam.id"
+                  :value="exam.id"
+                >
+                  {{ exam.name }} ({{ new Date(exam.createdAt).toLocaleDateString() }})
+                </option>
+              </select>
+            </div>
+            <div v-else class="exam-switcher">
+              <button class="exam-secondary-btn" @click="showNewExamConfig">
+                + Generate first test
+              </button>
+            </div>
+            <div class="exam-actions" v-if="selectedNote">
+              <button class="exam-secondary-btn" @click="showNewExamConfig">
+                + New test
+              </button>
+              <button
+                v-if="selectedExam"
+                class="exam-secondary-btn"
+                @click="redoCurrentExam"
+              >
+                Redo this test
+              </button>
+              <button
+                v-if="selectedExam"
+                class="exam-danger-btn"
+                @click="deleteExam(selectedExam.id)"
+              >
+                Delete test
+              </button>
+            </div>
+          </div>
           <div class="question-count">
             Total {{ totalQuestions }} questions / Question {{ currentIndex + 1 }}
           </div>
         </div>
         <div class="score-box">
-          Current score: {{ score }} pts
+          <div class="score-label">
+            <span class="score-title">Current score</span>
+            <span class="score-value">{{ score }}</span>
+            <span class="score-unit">/ {{ maxObjectiveScore }} pts</span>
+          </div>
+          <div
+            v-if="selectedExam && currentExamAttempts.length > 1"
+            class="attempt-switcher"
+          >
+            <label class="attempt-label">Attempts:</label>
+            <select
+              v-model="currentAttemptId"
+              @change="onChangeAttempt"
+              class="attempt-select"
+            >
+              <option
+                v-for="(att, idx) in currentExamAttempts"
+                :key="att.id"
+                :value="att.id"
+              >
+                {{ formatAttemptLabel(att, idx) }}
+              </option>
+            </select>
+          </div>
         </div>
       </div>
       
-      <div class="question-section">
+      <!-- 生成配置（简单表单，尽量不影响原有布局） -->
+      <div v-if="showGenerateConfig" class="question-section">
+        <div class="question-box">
+          <div class="question-header">
+            <div class="question-type">Generate exam</div>
+          </div>
+          <div class="question-body">
+            <div style="display:flex; flex-direction:column; gap:12px; max-width:480px;">
+              <label>
+                Test name:
+                <input
+                  v-model="generateConfig.name"
+                  type="text"
+                  style="width:100%; padding:6px 8px; border:1px solid #ddd; border-radius:4px;"
+                />
+              </label>
+              <label>
+                Question count:
+                <input
+                  v-model.number="generateConfig.questionCount"
+                  type="number"
+                  min="1"
+                  max="50"
+                  style="width:120px; padding:6px 8px; border:1px solid #ddd; border-radius:4px;"
+                />
+              </label>
+              <label>
+                Difficulty:
+                <select
+                  v-model="generateConfig.difficulty"
+                  style="width:160px; padding:6px 8px; border:1px solid #ddd; border-radius:4px;"
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <div>
+                <div style="margin-bottom:4px;">Question types:</div>
+                <label style="margin-right:12px;">
+                  <input
+                    type="checkbox"
+                    value="single"
+                    v-model="generateConfig.selectedTypes"
+                  />
+                  Single choice
+                </label>
+                <label style="margin-right:12px;">
+                  <input
+                    type="checkbox"
+                    value="true-false"
+                    v-model="generateConfig.selectedTypes"
+                  />
+                  True / False
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    value="open"
+                    v-model="generateConfig.selectedTypes"
+                  />
+                  Open question
+                </label>
+              </div>
+              <div class="answer-actions">
+                <button class="nav-btn" @click="showGenerateConfig = false">
+                  Cancel
+                </button>
+                <button class="submit-btn" @click="createNewExamWithAI">
+                  Generate exam
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="question-section" v-if="!showGenerateConfig">
         <div v-if="isGeneratingExam" class="exam-generating-banner">
           <div class="spinner"></div>
           <div class="exam-generating-text">
@@ -91,24 +232,26 @@
               No explanation provided for this question.
             </div>
           </div>
+          <div class="question-footer-actions" v-if="totalQuestions > 0">
+            <button class="nav-btn" :disabled="currentIndex === 0" @click="prevQuestion">Previous</button>
+            <button class="nav-btn" :disabled="currentIndex === totalQuestions - 1" @click="nextQuestion">Next</button>
+            <button class="submit-btn" @click="submitExam">Submit exam</button>
+          </div>
         </div>
       </div>
       
-      <div class="answer-section">
+      <div
+        v-if="currentQuestion.type === 'open question'"
+        class="answer-section"
+      >
         <div class="answer-box">
           <h3>Answer area</h3>
           <textarea
-            v-if="currentQuestion.type === 'open question'"
             v-model="subjectiveAnswer"
             class="answer-textarea"
             placeholder="Type your answer here..."
             @input="updateSubjectiveAnswer"
           />
-          <div class="answer-actions">
-            <button class="nav-btn" :disabled="currentIndex === 0" @click="prevQuestion">Previous</button>
-            <button class="nav-btn" :disabled="currentIndex === totalQuestions - 1" @click="nextQuestion">Next</button>
-            <button class="submit-btn" @click="submitExam">Submit exam</button>
-          </div>
         </div>
       </div>
     </div>
@@ -121,7 +264,31 @@ import { subjects as seedSubjects } from '../data/notes'
 
 // 从 localStorage 或默认数据构建科目和笔记
 const SUBJECTS_STORAGE_KEY = 'revai-subjects'
-const EXAMS_STORAGE_KEY = 'revai-exams' // 缓存 AI 生成试卷：{ [paperId]: { questions } }
+// 试卷与作答缓存（v2 结构，兼容旧数据）
+// 结构示例：
+// {
+//   [noteId]: {
+//     exams: {
+//       [examId]: {
+//         id,
+//         name,
+//         createdAt,
+//         config: { questionCount, difficulty, selectedTypes },
+//         questions: Question[],
+//         attempts: [
+//           {
+//             id,
+//             createdAt,
+//             score,
+//             answers,
+//             hasSubmitted
+//           }
+//         ]
+//       }
+//     }
+//   }
+// }
+const EXAMS_STORAGE_KEY = 'revai-exams-v2'
 const subjects = ref([])
 
 const loadSubjects = () => {
@@ -140,30 +307,59 @@ const loadSubjects = () => {
   subjects.value = seedSubjects.map(s => ({ ...s }))
 }
 
-// 试卷缓存：按 paperId 存储，包含 questions, answers, hasSubmitted, score
-const loadExamFromStorage = (paperId) => {
+// 从本地读取某个笔记下的所有试卷（兼容旧结构）
+const loadNoteExamsFromStorage = (noteId) => {
   try {
     const stored = localStorage.getItem(EXAMS_STORAGE_KEY)
-    if (!stored) return null
+    if (!stored) return { exams: {} }
     const parsed = JSON.parse(stored)
-    if (parsed && parsed[paperId] && Array.isArray(parsed[paperId].questions)) {
-      return parsed[paperId]
+    if (!parsed || typeof parsed !== 'object') return { exams: {} }
+    const noteData = parsed[noteId]
+    if (!noteData) return { exams: {} }
+    // 兼容旧数据：如果直接存的是 { questions, answers, ... }，则包装成默认考试 default
+    if (!noteData.exams) {
+      if (Array.isArray(noteData.questions) && noteData.questions.length) {
+        return {
+          exams: {
+            default: {
+              id: 'default',
+              name: '默认测试',
+              createdAt: noteData.savedAt || new Date().toISOString(),
+              config: {
+                questionCount: noteData.questions.length,
+                difficulty: 'medium',
+                selectedTypes: ['single', 'true-false', 'open'],
+              },
+              questions: noteData.questions,
+              attempts: [
+                {
+                  id: 'legacy',
+                  createdAt: noteData.savedAt || new Date().toISOString(),
+                  score: noteData.score || 0,
+                  answers: noteData.answers || {},
+                  hasSubmitted: !!noteData.hasSubmitted,
+                },
+              ],
+            },
+          },
+        }
+      }
+      return { exams: {} }
     }
+    return { exams: noteData.exams || {} }
   } catch (e) {
     console.warn('Failed to load exams from localStorage', e)
   }
-  return null
+  return { exams: {} }
 }
 
-const saveExamToStorage = (paperId, examData) => {
+// 保存某个笔记下的所有试卷
+const saveNoteExamsToStorage = (noteId, examsObject) => {
   try {
     const stored = localStorage.getItem(EXAMS_STORAGE_KEY)
     const all = stored ? JSON.parse(stored) : {}
-    all[paperId] = {
-      questions: examData.questions || [],
-      answers: examData.answers || {},
-      hasSubmitted: examData.hasSubmitted || false,
-      score: examData.score || 0,
+    all[noteId] = {
+      exams: examsObject,
       savedAt: new Date().toISOString(),
     }
     localStorage.setItem(EXAMS_STORAGE_KEY, JSON.stringify(all))
@@ -190,7 +386,15 @@ const papers = computed(() =>
   )
 )
 
-const selectedExam = ref(null)
+// 当前选中的笔记（paper 就是一个 note）
+const selectedNote = ref(null)
+// 当前笔记下的所有试卷
+const currentNoteExams = ref({}) // { [examId]: examMeta }
+
+// 当前正在答的“试卷 + 作答”
+const selectedExam = ref(null) // { id, name, questions, config, ... }
+const selectedExamId = ref(null) // 供下拉框使用
+const currentAttemptId = ref(null)
 const currentIndex = ref(0)
 const score = ref(0)
 const userAnswer = ref(null)
@@ -203,6 +407,37 @@ const questions = ref([])
 
 const totalQuestions = computed(() => questions.value.length)
 const currentQuestion = computed(() => questions.value[currentIndex.value] || {})
+
+// 当前试卷下的所有作答记录
+const currentExamAttempts = computed(() => {
+  if (!selectedExam.value || !Array.isArray(selectedExam.value.attempts)) {
+    return []
+  }
+  // 最近的在前
+  return [...selectedExam.value.attempts].sort((a, b) => {
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+  })
+})
+
+const formatAttemptLabel = (attempt, index) => {
+  const idx = currentExamAttempts.value.length - index
+  const date = attempt.createdAt ? new Date(attempt.createdAt).toLocaleString() : ''
+  const scoreText =
+    typeof attempt.score === 'number' && attempt.hasSubmitted
+      ? `Score: ${attempt.score}`
+      : 'Not submitted'
+  return `Attempt ${idx} - ${scoreText}${date ? ' (' + date + ')' : ''}`
+}
+
+// 当前试卷的客观题总分（只统计 single / true-false）
+const maxObjectiveScore = computed(() => {
+  if (!questions.value || !questions.value.length) return 0
+  return questions.value.reduce((sum, q) => {
+    if (!q || q.type === 'open question') return sum
+    const pts = parseInt(q.points, 10)
+    return sum + (Number.isFinite(pts) ? pts : 0)
+  }, 0)
+})
 
 // 判断选项是否为正确答案（支持大小写和 True/False 匹配）
 const isCorrectOption = (optionValue) => {
@@ -221,53 +456,66 @@ const formatQuestionType = (type) => {
   return typeMap[type] || type
 }
 
-// AI 生成试卷状态
+// AI 生成试卷状态 & 配置
 const isGeneratingExam = ref(false)
 const generatingExamStatus = ref('')
 
-const selectPaper = async (paper) => {
-  selectedExam.value = paper
-  currentIndex.value = 0
-  
-  // 先尝试从本地缓存读取试卷（包含题目、答案、提交状态）
-  const cached = loadExamFromStorage(paper.id)
-  if (cached && Array.isArray(cached.questions) && cached.questions.length) {
-    questions.value = cached.questions
-    answers.value = cached.answers || {}
-    hasSubmitted.value = cached.hasSubmitted || false
-    score.value = cached.score || 0
-    // 恢复第一题的作答状态
-    const firstQ = questions.value[0]
-    if (firstQ && firstQ.id && answers.value[firstQ.id]) {
-      if (firstQ.type === 'open question') {
-        subjectiveAnswer.value = answers.value[firstQ.id]
-        userAnswer.value = null
-      } else {
-        userAnswer.value = answers.value[firstQ.id]
-        subjectiveAnswer.value = ''
-      }
-    } else {
-      userAnswer.value = null
-      subjectiveAnswer.value = ''
-    }
-    return
-  }
+// 生成配置（题型、题数、难度）
+const showGenerateConfig = ref(false)
+const generateConfig = ref({
+  name: '测试1',
+  questionCount: 8,
+  difficulty: 'medium',
+  // 前端希望生成的题型，传给后端做提示
+  selectedTypes: ['single', 'true-false', 'open'],
+})
 
-  // 没有缓存，重置所有状态
+// 方便根据当前 exams 自动生成下一个测试名称
+const getNextExamName = () => {
+  if (!selectedNote.value) return '测试1'
+  const exams = currentNoteExams.value || {}
+  const prefix = '测试'
+  const existing = Object.values(exams).map(e => e.name).filter(Boolean)
+  let idx = 1
+  while (existing.includes(`${prefix}${idx}`)) {
+    idx += 1
+  }
+  return `${prefix}${idx}`
+}
+
+const selectPaper = async (paper) => {
+  // 选择笔记
+  selectedNote.value = paper
+  selectedExam.value = null
+  currentNoteExams.value = loadNoteExamsFromStorage(paper.id).exams || {}
   userAnswer.value = null
   subjectiveAnswer.value = ''
   answers.value = {}
   score.value = 0
   hasSubmitted.value = false
 
-  // 默认直接使用 AI 生成试卷；如失败再回退到本地生成
-  const success = await generateQuestionsWithAI(paper, { questionCount: paper.total || 8, difficulty: 'medium' })
-  if (!success) {
-    generateQuestionsFromContent(paper.content)
+  // 如果已有试卷，默认选中最新的一份及其最近一次作答
+  const exams = currentNoteExams.value
+  const examList = Object.values(exams).sort((a, b) => {
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+  })
+
+  if (examList.length) {
+    loadExamSession(examList[0].id, { useLatestAttempt: true })
+  } else {
+    // 没有试卷时，弹出生成配置
+    generateConfig.value = {
+      name: getNextExamName(),
+      questionCount: paper.total || 8,
+      difficulty: 'medium',
+      selectedTypes: ['single', 'true-false', 'open'],
+    }
+    showGenerateConfig.value = true
   }
 }
 
 const backToList = () => {
+  selectedNote.value = null
   selectedExam.value = null
   currentIndex.value = 0
   userAnswer.value = null
@@ -283,15 +531,7 @@ const selectAnswer = (val) => {
     userAnswer.value = val
     if (currentQuestion.value.id) {
       answers.value[currentQuestion.value.id] = val
-      // 自动保存答案到 localStorage
-      if (selectedExam.value?.id) {
-        saveExamToStorage(selectedExam.value.id, {
-          questions: questions.value,
-          answers: answers.value,
-          hasSubmitted: hasSubmitted.value,
-          score: score.value,
-        })
-      }
+      persistCurrentAttempt()
     }
   }
 }
@@ -320,15 +560,7 @@ const prevQuestion = () => {
 const updateSubjectiveAnswer = () => {
   if (currentQuestion.value.type === 'open question' && currentQuestion.value.id) {
     answers.value[currentQuestion.value.id] = subjectiveAnswer.value
-    // 自动保存答案到 localStorage
-    if (selectedExam.value?.id) {
-      saveExamToStorage(selectedExam.value.id, {
-        questions: questions.value,
-        answers: answers.value,
-        hasSubmitted: hasSubmitted.value,
-        score: score.value,
-      })
-    }
+    persistCurrentAttempt()
   }
 }
 
@@ -346,22 +578,15 @@ const submitExam = () => {
     const userAns = String(ans).trim().toUpperCase()
     const correct = String(q.correctAnswer || '').trim().toUpperCase()
     if (userAns && correct && userAns === correct) {
-      total += q.points || 0
+      const pts = parseInt(q.points, 10)
+      total += Number.isFinite(pts) ? pts : 0
     }
   })
 
   score.value = total
   hasSubmitted.value = true
 
-  // 保存提交状态到 localStorage
-  if (selectedExam.value?.id) {
-    saveExamToStorage(selectedExam.value.id, {
-      questions: questions.value,
-      answers: answers.value,
-      hasSubmitted: true,
-      score: total,
-    })
-  }
+  persistCurrentAttempt(true, total)
 
   alert(`Exam submitted! Your objective score: ${score.value} pts`)
 }
@@ -397,8 +622,181 @@ const generateQuestionsFromContent = (content) => {
   ]
 }
 
+// 根据当前 selectedExam + currentAttemptId，将答案等写回 localStorage
+const persistCurrentAttempt = (submitted = false, finalScore = null) => {
+  if (!selectedNote.value || !selectedExam.value || !currentAttemptId.value) return
+  const noteId = selectedNote.value.id
+  const exams = { ...(currentNoteExams.value || {}) }
+  const examId = selectedExam.value.id
+  const exam = exams[examId]
+  if (!exam) return
+
+  const attempts = Array.isArray(exam.attempts) ? [...exam.attempts] : []
+  const idx = attempts.findIndex(a => a.id === currentAttemptId.value)
+  const now = new Date().toISOString()
+  const payload = {
+    id: currentAttemptId.value,
+    createdAt: attempts[idx]?.createdAt || now,
+    score: typeof finalScore === 'number' ? finalScore : (attempts[idx]?.score || 0),
+    answers: { ...answers.value },
+    hasSubmitted: submitted ? true : (attempts[idx]?.hasSubmitted || false),
+  }
+  if (idx >= 0) {
+    attempts[idx] = payload
+  } else {
+    attempts.push(payload)
+  }
+
+  exams[examId] = {
+    ...exam,
+    questions: [...questions.value],
+    attempts,
+  }
+  currentNoteExams.value = exams
+  saveNoteExamsToStorage(noteId, exams)
+}
+
+// 选择某一套试卷 + 某次作答（或新作答）
+const loadExamSession = (examId, { attemptId = null, useLatestAttempt = false } = {}) => {
+  const exams = currentNoteExams.value || {}
+  const exam = exams[examId]
+  if (!exam) return
+
+  selectedExam.value = exam
+  selectedExamId.value = exam.id
+  questions.value = Array.isArray(exam.questions) ? [...exam.questions] : []
+  currentIndex.value = 0
+
+  const attempts = Array.isArray(exam.attempts) ? exam.attempts : []
+  let targetAttempt = null
+
+  if (attemptId) {
+    targetAttempt = attempts.find(a => a.id === attemptId) || null
+  } else if (useLatestAttempt && attempts.length) {
+    targetAttempt = [...attempts].sort((a, b) => {
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })[0]
+  }
+
+  if (!targetAttempt) {
+    // 新作答
+    const newAttemptId = `attempt-${Date.now()}`
+    currentAttemptId.value = newAttemptId
+    answers.value = {}
+    score.value = 0
+    hasSubmitted.value = false
+    userAnswer.value = null
+    subjectiveAnswer.value = ''
+    persistCurrentAttempt(false, 0)
+  } else {
+    currentAttemptId.value = targetAttempt.id
+    answers.value = { ...(targetAttempt.answers || {}) }
+    score.value = targetAttempt.score || 0
+    hasSubmitted.value = !!targetAttempt.hasSubmitted
+
+    // 恢复第一题的作答状态
+    const firstQ = questions.value[0]
+    if (firstQ && firstQ.id && targetAttempt.answers[firstQ.id]) {
+      if (firstQ.type === 'open question') {
+        subjectiveAnswer.value = targetAttempt.answers[firstQ.id]
+        userAnswer.value = null
+      } else {
+        userAnswer.value = targetAttempt.answers[firstQ.id]
+        subjectiveAnswer.value = ''
+      }
+    } else {
+      userAnswer.value = null
+      subjectiveAnswer.value = ''
+    }
+  }
+}
+
+// 创建一套新试卷（根据当前配置）
+const createNewExamWithAI = async () => {
+  if (!selectedNote.value) return
+  const paper = selectedNote.value
+  const cfg = generateConfig.value
+
+  showGenerateConfig.value = false
+
+  // 初始化状态
+  userAnswer.value = null
+  subjectiveAnswer.value = ''
+  answers.value = {}
+  score.value = 0
+  hasSubmitted.value = false
+
+  const success = await generateQuestionsWithAI(paper, {
+    questionCount: cfg.questionCount || 8,
+    difficulty: cfg.difficulty || 'medium',
+    selectedTypes: cfg.selectedTypes || ['single', 'true-false', 'open'],
+  })
+  if (!success) {
+    generateQuestionsFromContent(paper.content)
+  }
+}
+
+// 供下拉框切换试卷时使用
+const onChangeExam = () => {
+  if (!selectedExamId.value) return
+  loadExamSession(selectedExamId.value, { useLatestAttempt: true })
+}
+
+// 在同一套试卷内切换不同作答记录
+const onChangeAttempt = () => {
+  if (!selectedExam.value || !currentAttemptId.value) return
+  loadExamSession(selectedExam.value.id, { attemptId: currentAttemptId.value })
+}
+
+// 手动打开生成配置（比如点击“New test”按钮）
+const showNewExamConfig = () => {
+  if (!selectedNote.value) return
+  generateConfig.value = {
+    name: getNextExamName(),
+    questionCount: selectedNote.value.total || 8,
+    difficulty: 'medium',
+    selectedTypes: ['single', 'true-false', 'open'],
+  }
+  showGenerateConfig.value = true
+}
+
+// 删除一整套试卷
+const deleteExam = (examId) => {
+  if (!selectedNote.value) return
+  const exams = { ...(currentNoteExams.value || {}) }
+  if (!exams[examId]) return
+  if (!confirm('确定要删除这套测试吗？此操作无法撤销，但不会删除笔记本身。')) return
+
+  delete exams[examId]
+  currentNoteExams.value = exams
+  saveNoteExamsToStorage(selectedNote.value.id, exams)
+
+  // 如果删掉的是当前正在看的试卷，则切换到最新一份或清空
+  if (selectedExam.value?.id === examId) {
+    const examList = Object.values(exams).sort((a, b) => {
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+    if (examList.length) {
+      loadExamSession(examList[0].id, { useLatestAttempt: true })
+    } else {
+      selectedExam.value = null
+      questions.value = []
+      currentIndex.value = 0
+      answers.value = {}
+      score.value = 0
+      hasSubmitted.value = false
+    }
+  }
+}
+
+// 为当前试卷再做一次（保留历史作答）
+const redoCurrentExam = () => {
+  if (!selectedExam.value) return
+  loadExamSession(selectedExam.value.id, { attemptId: null, useLatestAttempt: false })
+}
+
 // 使用后端 AI 生成试卷
-const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 'medium' } = {}) => {
+const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 'medium', selectedTypes = ['single', 'true-false', 'open'] } = {}) => {
   if (!paper?.content) {
     return false
   }
@@ -417,6 +815,7 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
         noteContent: paper.content,
         questionCount,
         difficulty,
+        selectedTypes,
       }),
     })
 
@@ -485,9 +884,30 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
     })
 
     questions.value = mapped
-    // 缓存到本地，避免下次重复生成
+
+    // 创建一套新的试卷元数据
     if (paper?.id) {
-      saveExamToStorage(paper.id, { questions: mapped })
+      const exams = { ...(currentNoteExams.value || {}) }
+      const examId = `exam-${Date.now()}`
+      const cfg = generateConfig.value
+      const examMeta = {
+        id: examId,
+        name: cfg.name || getNextExamName(),
+        createdAt: new Date().toISOString(),
+        config: {
+          questionCount: questionCount,
+          difficulty,
+          selectedTypes,
+        },
+        questions: mapped,
+        attempts: [],
+      }
+      exams[examId] = examMeta
+      currentNoteExams.value = exams
+      saveNoteExamsToStorage(paper.id, exams)
+
+      // 立刻进入这套试卷的首次作答
+      loadExamSession(examId, { attemptId: null })
     }
 
     generatingExamStatus.value = `AI generated ${questions.value.length} questions.`
@@ -564,22 +984,55 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
   justify-content: space-between;
 }
 
-.exam-header {
+ .exam-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: stretch;
   background-color: #fff;
   padding: 16px 24px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  gap: 16px;
 }
 
-.exam-info {
+.exam-info-left {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   font-size: 16px;
   color: #333;
+}
+
+.exam-sub-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.exam-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exam-switcher-label {
+  font-size: 13px;
+  color: #555;
+}
+
+.exam-switcher-select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  font-size: 13px;
+  background-color: #fafafa;
+}
+
+.exam-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .question-count {
@@ -592,11 +1045,60 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
 }
 
 .score-box {
-  background-color: #f5f5f5;
-  padding: 8px 16px;
-  border-radius: 4px;
+  min-width: 180px;
+  background: linear-gradient(135deg, #e3f2fd 0%, #e8f5e9 100%);
+  padding: 10px 16px;
+  border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.score-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.score-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #1a237e;
+  letter-spacing: 0.04em;
+}
+
+.score-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2e7d32;
+}
+
+.score-unit {
+  font-size: 12px;
+  color: #388e3c;
+}
+
+.attempt-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.attempt-label {
+  font-size: 12px;
+  color: #424242;
+}
+
+.attempt-select {
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #c5cae9;
+  background-color: #ffffff;
 }
 
 .question-section {
@@ -824,5 +1326,39 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
 .submit-btn:hover {
   background-color: #1565c0;
   border-color: #1565c0;
+}
+
+.exam-secondary-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  background-color: #fafafa;
+  cursor: pointer;
+  font-size: 13px;
+  color: #424242;
+  transition: all 0.2s;
+}
+
+.exam-secondary-btn:hover {
+  background-color: #e3f2fd;
+  border-color: #90caf9;
+  color: #1565c0;
+}
+
+.exam-danger-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #ffcdd2;
+  background-color: #ffebee;
+  cursor: pointer;
+  font-size: 13px;
+  color: #c62828;
+  transition: all 0.2s;
+}
+
+.exam-danger-btn:hover {
+  background-color: #ffcdd2;
+  border-color: #e53935;
+  color: #b71c1c;
 }
 </style>
