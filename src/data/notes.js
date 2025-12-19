@@ -56,7 +56,28 @@ export const subjects = [
   }
 ]
 
+const STORAGE_KEY = 'revai-subjects'
+
 export const findNoteById = (noteId) => {
+  // 先从 localStorage 中查找（包含用户动态添加的笔记）
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed)) {
+        for (const subject of parsed) {
+          const note = (subject.notes || []).find((n) => n.id === noteId)
+          if (note) {
+            return { subject, note }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to read subjects from localStorage in findNoteById', e)
+  }
+
+  // fallback: 在默认模拟数据中查找
   for (const subject of subjects) {
     const note = subject.notes.find((n) => n.id === noteId)
     if (note) {

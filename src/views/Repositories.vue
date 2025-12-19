@@ -52,7 +52,16 @@
           :key="note.id"
           @click="goToNote(note.id)"
         >
-          <div class="note-title">{{ note.title }}</div>
+          <div class="note-header">
+            <div class="note-title">{{ note.title }}</div>
+            <button
+              class="note-delete-btn"
+              @click.stop="deleteNote(note.id)"
+              title="Delete note"
+            >
+              ×
+            </button>
+          </div>
           <div class="note-desc">{{ trimContent(note.content) }}</div>
           <div class="note-meta">Updated at: {{ note.updatedAt }}</div>
         </div>
@@ -79,6 +88,7 @@
               multiple
               class="file-input-hidden"
               @change="onFileChange"
+              accept=".txt,.md,.pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg"
             />
             <input 
               type="text" 
@@ -86,12 +96,24 @@
               class="repo-name-input"
               v-model="noteName"
             />
-            <button class="look-btn" @click="submitToAI">Submit</button>
+            <button class="look-btn" @click="submitToAI" :disabled="isGenerating">
+              {{ isGenerating ? 'Generating...' : 'Generate Notes with AI' }}
+            </button>
           </div>
-          <p class="create-hint">
-            Upload files and ask AI to generate or update notes for this subject.
+          
+          <!-- 生成中的动态提示 -->
+          <div v-if="isGenerating" class="generating-status">
+            <div class="generating-spinner"></div>
+            <div class="generating-text">
+              <span class="generating-title">✨ AI is creating your notes</span>
+              <span class="generating-detail">{{ generatingStatus }}</span>
+            </div>
+          </div>
+          
+          <p v-else class="create-hint">
+            Upload files and AI will generate well-structured, high-quality study notes for you.
           </p>
-          <ul v-if="selectedFiles.length" class="file-list">
+          <ul v-if="selectedFiles.length && !isGenerating" class="file-list">
             <li
               v-for="(file, index) in selectedFiles"
               :key="file.name + index"
@@ -146,11 +168,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { subjects as subjectList } from '../data/notes'
 
 const router = useRouter()
+
+const STORAGE_KEY = 'revai-subjects'
 
 const subjects = ref(subjectList.map((s) => ({ ...s })))
 const selectedSubject = ref(null)
@@ -161,6 +185,35 @@ const showSubjectDialog = ref(false)
 const dialogMode = ref('create') // 'create' | 'edit'
 const dialogName = ref('')
 const dialogSubject = ref(null)
+
+const saveSubjects = () => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(subjects.value))
+  } catch (e) {
+    console.warn('Failed to save subjects to localStorage', e)
+  }
+}
+
+const loadSubjects = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed) && parsed.length) {
+        subjects.value = parsed
+        return
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load subjects from localStorage', e)
+  }
+  // fallback: use default seed data
+  subjects.value = subjectList.map((s) => ({ ...s }))
+}
+
+onMounted(() => {
+  loadSubjects()
+})
 
 const selectSubject = (subject) => {
   selectedSubject.value = subject
@@ -194,6 +247,7 @@ const deleteSubject = (id) => {
   if (selectedSubject.value?.id === id) {
     selectedSubject.value = null
   }
+  saveSubjects()
 }
 
 const toggleMenu = (id) => {
@@ -225,6 +279,7 @@ const confirmSubjectDialog = () => {
   }
 
   closeSubjectDialog()
+  saveSubjects()
 }
 
 const trimContent = (content) => {
@@ -264,22 +319,110 @@ const onFileChange = (event) => {
   }
 }
 
-const submitToAI = () => {
+const isGenerating = ref(false)
+const generatedNote = ref(null)
+
+const generatingStatus = ref('')
+
+const submitToAI = async () => {
   if (!selectedFiles.value.length) {
-    alert('Please add at least one file.')
+    alert('Please upload at least one file.')
     return
   }
-  // TODO: send selectedFiles and noteName to backend / AI service
-  console.log('Submitting to AI:', {
-    subject: selectedSubject.value,
-    noteName: noteName.value,
-    files: selectedFiles.value
-  })
-  alert('Files submitted to AI (mock).')
+
+  isGenerating.value = true
+  generatedNote.value = null
+  generatingStatus.value = 'Uploading files...'
+
+  try {
+    // 构建 FormData
+    const formData = new FormData()
+    selectedFiles.value.forEach((file) => {
+      formData.append('files', file)
+    })
+    formData.append('noteName', noteName.value || 'Study Notes')
+    formData.append('subjectName', selectedSubject.value?.name || '')
+
+    console.log('📤 Uploading files and generating notes...')
+    
+    // 模拟进度提示
+    setTimeout(() => {
+      if (isGenerating.value) generatingStatus.value = 'Processing your files...'
+    }, 1500)
+    setTimeout(() => {
+      if (isGenerating.value) generatingStatus.value = 'AI is analyzing the content...'
+    }, 3000)
+    setTimeout(() => {
+      if (isGenerating.value) generatingStatus.value = 'Organizing key concepts...'
+    }, 6000)
+    setTimeout(() => {
+      if (isGenerating.value) generatingStatus.value = 'Structuring your notes...'
+    }, 10000)
+    setTimeout(() => {
+      if (isGenerating.value) generatingStatus.value = 'Almost done, please wait...'
+    }, 15000)
+
+    const response = await fetch('/api/ai/generate-note', {
+      method: 'POST',
+      body: formData,
+    })
+
+    // 尝试解析为 JSON；如果不是 JSON，则读取原始文本
+    if (!response.ok) {
+      const text = await response.text()
+      let errMsg = text
+      try {
+        const errorData = JSON.parse(text)
+        errMsg = errorData.error || JSON.stringify(errorData)
+      } catch (e) {
+        // 不是 JSON，就直接用文本
+      }
+      throw new Error(errMsg || 'Generation failed')
+    }
+
+    const data = await response.json()
+    console.log('✅ Note generated successfully:', data)
+
+    // 将生成的笔记添加到当前科目
+    if (data.note && selectedSubject.value) {
+      const newNote = {
+        id: Date.now().toString(),
+        title: data.note.title,
+        content: data.note.content,
+        updatedAt: new Date().toLocaleString(),
+      }
+      selectedSubject.value.notes.push(newNote)
+      generatedNote.value = newNote
+      
+      // 清空表单
+      selectedFiles.value = []
+      noteName.value = ''
+      
+      alert('🎉 Notes generated successfully! Added to current subject.')
+      saveSubjects()
+    }
+  } catch (error) {
+    console.error('❌ Failed to generate notes:', error)
+    alert('Failed to generate notes: ' + error.message)
+  } finally {
+    isGenerating.value = false
+    generatingStatus.value = ''
+  }
 }
 
 const removeFile = (index) => {
   selectedFiles.value.splice(index, 1)
+}
+
+// 删除笔记
+const deleteNote = (noteId) => {
+  if (!confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+    return
+  }
+  if (selectedSubject.value) {
+    selectedSubject.value.notes = selectedSubject.value.notes.filter(n => n.id !== noteId)
+    saveSubjects()
+  }
 }
 </script>
 
@@ -502,6 +645,94 @@ const removeFile = (index) => {
 .note-meta {
   font-size: 12px;
   color: #999;
+}
+
+.note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.note-delete-btn {
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.note-delete-btn:hover {
+  background-color: #ffebee;
+  color: #e53935;
+}
+
+/* 生成中的动态提示 */
+.generating-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  border-radius: 12px;
+  margin: 12px 0;
+  animation: pulse-bg 2s ease-in-out infinite;
+}
+
+@keyframes pulse-bg {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.generating-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.generating-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.generating-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1976d2;
+}
+
+.generating-detail {
+  font-size: 13px;
+  color: #666;
+  animation: fade-in-out 1.5s ease-in-out infinite;
+}
+
+@keyframes fade-in-out {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* 让科目卡片在小屏也保持舒适间距 */

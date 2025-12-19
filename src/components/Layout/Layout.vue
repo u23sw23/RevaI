@@ -21,6 +21,14 @@
         </router-view>
       </main>
     </div>
+
+    <!-- 全局学习小精灵（固定悬浮在页面上） -->
+    <AiSprite
+      :user-name="currentUser?.name || ''"
+      :last-login-at="currentUser?.lastLoginAt || ''"
+      :today-study-minutes="0"
+      :today-wrong-count="0"
+    />
   </div>
 </template>
 
@@ -28,6 +36,7 @@
 import { ref, onMounted } from 'vue'
 import TopHeader from './TopHeader.vue'
 import Sidebar from './Sidebar.vue'
+import AiSprite from '../AiSprite.vue'
 
 // 从 TopHeader 接收到的搜索关键词
 const searchKeyword = ref('')
