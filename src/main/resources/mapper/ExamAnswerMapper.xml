@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.mapper.ExamAnswerMapper">
+    
+    <resultMap id="ExamAnswerResultMap" type="com.example.demo.entity.ExamAnswer">
+        <id property="id" column="id"/>
+        <result property="examId" column="exam_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="questionId" column="question_id"/>
+        <result property="answer" column="answer"/>
+        <result property="score" column="score"/>
+        <result property="submitTime" column="submit_time"/>
+    </resultMap>
+    
+    <select id="findByExamIdAndUserId" resultMap="ExamAnswerResultMap">
+        SELECT * FROM exam_answers 
+        WHERE exam_id = #{examId} AND user_id = #{userId}
+        ORDER BY question_id
+    </select>
+    
+    <select id="findByExamIdAndUserIdAndQuestionId" resultMap="ExamAnswerResultMap">
+        SELECT * FROM exam_answers 
+        WHERE exam_id = #{examId} AND user_id = #{userId} AND question_id = #{questionId}
+        LIMIT 1
+    </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO exam_answers (exam_id, user_id, question_id, answer, score, submit_time)
+        VALUES (#{examId}, #{userId}, #{questionId}, #{answer}, #{score}, #{submitTime})
+    </insert>
+    
+    <update id="update">
+        UPDATE exam_answers
+        SET answer = #{answer},
+            score = #{score},
+            submit_time = #{submitTime}
+        WHERE id = #{id}
+    </update>
+    
+    <delete id="deleteByExamIdAndUserId">
+        DELETE FROM exam_answers WHERE exam_id = #{examId} AND user_id = #{userId}
+    </delete>
+</mapper>
+

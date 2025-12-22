@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.mapper.GroupMapper">
+    
+    <resultMap id="GroupResultMap" type="com.example.demo.entity.Group">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="creatorId" column="creator_id"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+    
+    <select id="findByUserId" resultMap="GroupResultMap">
+        SELECT g.* FROM `groups` g
+        INNER JOIN group_members gm ON g.id = gm.group_id
+        WHERE gm.user_id = #{userId}
+        ORDER BY g.update_time DESC
+    </select>
+    
+    <select id="findById" resultMap="GroupResultMap">
+        SELECT * FROM `groups` WHERE id = #{id}
+    </select>
+    
+    <select id="findByName" resultMap="GroupResultMap">
+        SELECT * FROM `groups` WHERE name = #{name}
+    </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO `groups` (name, creator_id, create_time, update_time)
+        VALUES (#{name}, #{creatorId}, #{createTime}, #{updateTime})
+    </insert>
+    
+    <update id="update">
+        UPDATE `groups`
+        SET name = #{name},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+    
+    <delete id="delete">
+        DELETE FROM `groups` WHERE id = #{id}
+    </delete>
+</mapper>
+

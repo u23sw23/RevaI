@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.mapper.ExamMapper">
+    
+    <resultMap id="ExamResultMap" type="com.example.demo.entity.Exam">
+        <id property="id" column="id"/>
+        <result property="title" column="title"/>
+        <result property="noteId" column="note_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="totalQuestions" column="total_questions"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+    
+    <select id="findByNoteId" resultMap="ExamResultMap">
+        SELECT * FROM exams WHERE note_id = #{noteId}
+    </select>
+    
+    <select id="findById" resultMap="ExamResultMap">
+        SELECT * FROM exams WHERE id = #{id}
+    </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO exams (title, note_id, user_id, total_questions, create_time, update_time)
+        VALUES (#{title}, #{noteId}, #{userId}, #{totalQuestions}, #{createTime}, #{updateTime})
+    </insert>
+    
+    <update id="update">
+        UPDATE exams
+        SET title = #{title},
+            total_questions = #{totalQuestions},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+    
+    <delete id="deleteById">
+        DELETE FROM exams WHERE id = #{id}
+    </delete>
+</mapper>
+

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.mapper.QuestionMapper">
+    
+    <resultMap id="QuestionResultMap" type="com.example.demo.entity.Question">
+        <id property="id" column="id"/>
+        <result property="examId" column="exam_id"/>
+        <result property="title" column="title"/>
+        <result property="type" column="type"/>
+        <result property="points" column="points"/>
+        <result property="correctAnswer" column="correct_answer"/>
+        <result property="explanation" column="explanation"/>
+        <result property="optionsJson" column="options"/>
+        <!-- options字段需要在Service层通过JSON解析处理 -->
+    </resultMap>
+    
+    <select id="findByExamId" resultMap="QuestionResultMap">
+        SELECT id, exam_id, title, type, points, correct_answer, options, explanation 
+        FROM questions WHERE exam_id = #{examId} ORDER BY id
+    </select>
+    
+    <select id="findById" resultMap="QuestionResultMap">
+        SELECT * FROM questions WHERE id = #{id}
+    </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO questions (exam_id, title, type, points, correct_answer, options, explanation)
+        VALUES (#{examId}, #{title}, #{type}, #{points}, #{correctAnswer}, 
+                #{optionsJson, jdbcType=VARCHAR}, #{explanation})
+    </insert>
+    
+    <update id="update">
+        UPDATE questions
+        SET title = #{title},
+            type = #{type},
+            points = #{points},
+            correct_answer = #{correctAnswer},
+            options = #{optionsJson, jdbcType=VARCHAR},
+            explanation = #{explanation}
+        WHERE id = #{id}
+    </update>
+    
+    <delete id="deleteByExamId">
+        DELETE FROM questions WHERE exam_id = #{examId}
+    </delete>
+</mapper>
+
