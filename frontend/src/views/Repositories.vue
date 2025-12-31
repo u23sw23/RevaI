@@ -3,23 +3,32 @@
     <h2 class="page-title">Subjects / Notes</h2>
     <p class="page-subtitle">Select a subject, then choose one of its notes to view details.</p>
 
-    <!-- 科目列表 -->
-    <div class="subjects-grid" v-if="!selectedSubject">
-      <div
-        class="subject-card"
-        v-for="subject in subjects"
-        :key="subject.id"
-        @click="selectSubject(subject)"
-      >
+    <div v-if="!selectedSubject" class="subjects-container">
+      
+      <div v-if="personalSubjects.length > 0" class="subjects-section">
+        <h3 class="section-title">Personal Subjects</h3>
+        <div class="subjects-grid">
+          <div
+            class="subject-card"
+            v-for="subject in personalSubjects"
+            :key="subject.id"
+            @click="selectSubject(subject)"
+          >
         <div class="subject-header">
           <div class="subject-main">
-            <div class="subject-title-row">
+              <div class="subject-title-row">
               <div class="subject-title">{{ subject?.name }}</div>
               <span 
                 class="visibility-badge" 
-                :class="subject?.visibility === 'public' ? 'public' : 'private'"
+                :class="subject?.visibility === 'public' ? 'public' : (subject?.visibility === 'clone' ? 'clone' : 'private')"
               >
-                {{ subject?.visibility === 'public' ? 'Public' : 'Private' }}
+                {{
+                  subject?.visibility === 'public'
+                    ? 'Public'
+                    : subject?.visibility === 'clone'
+                    ? 'Clone'
+                    : 'Private'
+                }}
               </span>
             </div>
             <div v-if="subject?.description" class="subject-desc">{{ subject?.description }}</div>
@@ -40,9 +49,37 @@
         </div>
         <div class="subject-meta">Notes: {{ subject?.notes?.length || 0 }}</div>
       </div>
+        </div>
+      </div>
+
+      <div v-if="groupSubjects.length > 0" class="subjects-section group-section">
+        <h3 class="section-title">Group Subjects</h3>
+        <div class="subjects-grid">
+          <div
+            class="subject-card"
+            v-for="subject in groupSubjects"
+            :key="subject.id"
+            @click="selectSubject(subject)"
+          >
+            <div class="subject-header">
+              <div class="subject-main">
+                  <div class="subject-title-row">
+                  <div class="subject-title">{{ subject?.name }}</div>
+                  <span 
+                    class="visibility-badge group-badge"
+                  >
+                    Group
+                  </span>
+                </div>
+                <div v-if="subject?.description" class="subject-desc">{{ subject?.description }}</div>
+              </div>
+            </div>
+            <div class="subject-meta">Notes: {{ subject?.notes?.length || 0 }}</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- 笔记列表（选中某科目后） -->
     <div v-else class="notes-panel">
       <div class="notes-header">
         <div>
@@ -67,7 +104,6 @@
       </div>
     </div>
 
-    <!-- Upload / create notes (visible only when a subject is selected) -->
     <div v-if="selectedSubject" class="create-section">
       <div
         class="drop-zone"
@@ -98,8 +134,7 @@
               {{ isGenerating ? 'Generating...' : 'Generate Notes with AI' }}
             </button>
           </div>
-          
-          <!-- 生成中的动态提示 -->
+
           <div v-if="isGenerating" class="generating-status">
             <div class="generating-spinner"></div>
             <div class="generating-text">
@@ -132,7 +167,6 @@
       </div>
     </div>
 
-    <!-- 浮动创建按钮 -->
     <button
       v-if="!selectedSubject"
       class="fab"
@@ -141,7 +175,6 @@
       +
     </button>
 
-    <!-- Subject create / rename dialog -->
     <div
       v-if="showSubjectDialog"
       class="modal-mask"
@@ -192,12 +225,24 @@ import { api } from '../utils/api'
 
 const router = useRouter()
 
-const subjects = ref([])
+const personalSubjects = ref([])
+const groupSubjects = ref([])
 const selectedSubject = ref(null)
 const activeMenuId = ref(null)
 const loading = ref(false)
 
-// 获取当前用户ID（从localStorage或props）
+const findSubjectInArrays = (subjectId) => {
+  const personalIndex = personalSubjects.value.findIndex(s => s.id === subjectId)
+  if (personalIndex !== -1) {
+    return { array: personalSubjects, index: personalIndex, type: 'personal' }
+  }
+  const groupIndex = groupSubjects.value.findIndex(s => s.id === subjectId)
+  if (groupIndex !== -1) {
+    return { array: groupSubjects, index: groupIndex, type: 'group' }
+  }
+  return null
+}
+
 const getCurrentUserId = () => {
   const savedUser = localStorage.getItem('auth_user')
   if (savedUser) {
@@ -210,10 +255,9 @@ const getCurrentUserId = () => {
       console.error('Failed to parse user from localStorage:', e)
     }
   }
-  return null // 如果没有登录用户，返回 null
+  return null 
 }
 
-// 加载科目列表
 const loadSubjects = async () => {
   loading.value = true
   try {
@@ -222,7 +266,9 @@ const loadSubjects = async () => {
       alert('请先登录')
       return
     }
-    subjects.value = await api.getSubjects(userId)
+    const separated = await api.getSubjectsSeparated(userId)
+    personalSubjects.value = separated.personal || []
+    groupSubjects.value = separated.group || []
   } catch (error) {
     console.error('Failed to load subjects:', error)
     alert('加载科目列表失败：' + error.message)
@@ -235,9 +281,8 @@ onMounted(() => {
   loadSubjects()
 })
 
-// 弹窗状态
 const showSubjectDialog = ref(false)
-const dialogMode = ref('create') // 'create' | 'edit'
+const dialogMode = ref('create') 
 const dialogName = ref('')
 const dialogDescription = ref('')
 const dialogVisibility = ref('private')
@@ -277,7 +322,10 @@ const deleteSubject = async (id) => {
   
   try {
     await api.deleteSubject(id)
-    subjects.value = subjects.value.filter((s) => s.id !== id)
+    const found = findSubjectInArrays(id)
+    if (found) {
+      found.array.value = found.array.value.filter((s) => s.id !== id)
+    }
     
     if (selectedSubject.value?.id === id) {
       selectedSubject.value = null
@@ -316,31 +364,31 @@ const confirmSubjectDialog = async () => {
 
   try {
     if (dialogMode.value === 'edit' && dialogSubject.value) {
-      // 更新科目
+      
       const updated = await api.updateSubject(dialogSubject.value.id, {
         name,
         description: dialogDescription.value.trim(),
         visibility: dialogVisibility.value
       })
-      // 更新本地数据
-      const index = subjects.value.findIndex(s => s.id === dialogSubject.value.id)
-      if (index !== -1) {
-        subjects.value[index] = updated
+      
+      const found = findSubjectInArrays(dialogSubject.value.id)
+      if (found) {
+        found.array.value[found.index] = updated
       }
-      // 如果当前选中的是正在编辑的科目，也要更新
+      
       if (selectedSubject.value?.id === dialogSubject.value.id) {
         selectedSubject.value = updated
       }
       alert('更新成功')
     } else if (dialogMode.value === 'create') {
-      // 创建科目
+      
       const newSubject = await api.createSubject({
         name,
         description: dialogDescription.value.trim(),
         visibility: dialogVisibility.value,
         userId
       })
-      subjects.value.push(newSubject)
+      personalSubjects.value.push(newSubject)
       alert('创建成功')
     }
     
@@ -360,7 +408,6 @@ const goToNote = (noteId) => {
   router.push(`/repositories/${noteId}`)
 }
 
-// drag & drop upload state and handlers
 const isDragging = ref(false)
 const selectedFiles = ref([])
 const noteName = ref('')
@@ -411,7 +458,7 @@ const submitToAI = async () => {
   generatingStatus.value = 'Uploading files...'
 
   try {
-    // 模拟进度提示
+    
     setTimeout(() => {
       if (isGenerating.value) generatingStatus.value = 'Processing your files...'
     }, 1500)
@@ -428,7 +475,6 @@ const submitToAI = async () => {
       if (isGenerating.value) generatingStatus.value = 'Almost done, please wait...'
     }, 15000)
 
-    // 1. 先调用AI接口生成笔记
     const formData = new FormData()
     selectedFiles.value.forEach((file) => {
       formData.append('files', file)
@@ -439,7 +485,7 @@ const submitToAI = async () => {
     const aiResponse = await fetch('/api/ai/generate-note', {
       method: 'POST',
       body: formData,
-      // 增加超时时间（5分钟）
+      
       signal: AbortSignal.timeout(300000)
     })
 
@@ -450,7 +496,7 @@ const submitToAI = async () => {
         const errorData = JSON.parse(text)
         errMsg = errorData.error || JSON.stringify(errorData)
       } catch (e) {
-        // 不是 JSON，就直接用文本
+        
       }
       throw new Error(errMsg || 'Generation failed')
     }
@@ -462,29 +508,26 @@ const submitToAI = async () => {
       throw new Error('AI 返回格式错误')
     }
 
-    // 2. 将生成的笔记保存到后端
     const newNote = await api.createNote({
       title: aiData.note.title,
       content: aiData.note.content,
       subjectId: selectedSubject.value.id,
       userId: userId
     })
-    
-    // 刷新当前科目的笔记列表
+
     const updatedSubject = await api.getSubjectById(selectedSubject.value.id)
     if (updatedSubject) {
       selectedSubject.value = updatedSubject
-      // 同时更新subjects列表中的对应科目
-      const index = subjects.value.findIndex(s => s.id === selectedSubject.value.id)
-      if (index !== -1) {
-        subjects.value[index] = updatedSubject
+      
+      const found = findSubjectInArrays(selectedSubject.value.id)
+      if (found) {
+        found.array.value[found.index] = updatedSubject
       }
     }
-    
-    // 清空表单
+
     selectedFiles.value = []
     noteName.value = ''
-    alert('🎉 Notes generated successfully! Added to current subject.')
+    alert('Notes generated successfully')
   } catch (error) {
     console.error('❌ Failed to generate notes:', error)
     let errorMsg = error.message || 'Unknown error'
@@ -515,16 +558,47 @@ const removeFile = (index) => {
 }
 
 .page-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1976D2 0%, #2196F3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 8px;
+  letter-spacing: -0.5px;
 }
 
 .page-subtitle {
-  color: #666;
+  color: #546E7A;
   font-size: 14px;
-  margin-bottom: 8px;
+  margin-bottom: 24px;
+  font-weight: 400;
+}
+
+.subjects-container {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.subjects-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.group-section {
+  margin-top: 8px;
+  padding-top: 32px;
+  border-top: 2px solid rgba(144, 202, 249, 0.3);
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1565C0;
+  margin-bottom: 4px;
+  letter-spacing: -0.3px;
 }
 
 .subjects-grid {
@@ -534,21 +608,24 @@ const removeFile = (index) => {
 }
 
 .subject-card {
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.08);
   cursor: pointer;
-  transition: all 0.2s;
-  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  border: 2px solid rgba(144, 202, 249, 0.8);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
 }
 
 .subject-card:hover {
-  border-color: #1976d2;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+  border-color: #2196F3;
+  box-shadow: 0 8px 24px rgba(33, 150, 243, 0.25), 0 0 0 3px rgba(33, 150, 243, 0.15);
+  transform: translateY(-2px);
 }
 
 .subject-title-row {
@@ -559,9 +636,10 @@ const removeFile = (index) => {
 }
 
 .subject-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: #1565C0;
+  margin-bottom: 4px;
 }
 
 .visibility-badge {
@@ -581,9 +659,20 @@ const removeFile = (index) => {
   color: white;
 }
 
+.visibility-badge.clone {
+  background-color: #0D47A1;
+  color: #E3F2FD;
+}
+
+.visibility-badge.group-badge {
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+  color: white;
+}
+
 .subject-desc {
   font-size: 14px;
-  color: #666;
+  color: #546E7A;
+  font-weight: 400;
 }
 
 .subject-meta {
@@ -665,13 +754,14 @@ const removeFile = (index) => {
 }
 
 .notes-panel {
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(33, 150, 243, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  border: 2px solid rgba(144, 202, 249, 0.8);
 }
 
 .notes-header {
@@ -687,9 +777,10 @@ const removeFile = (index) => {
 }
 
 .notes-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1565C0;
+  letter-spacing: -0.3px;
 }
 
 .notes-subtitle {
@@ -698,18 +789,22 @@ const removeFile = (index) => {
 }
 
 .back-btn {
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  background-color: #fff;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 2px solid rgba(187, 222, 251, 0.8);
+  background-color: #FFFFFF;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .back-btn:hover {
-  border-color: #1976d2;
-  color: #1976d2;
+  border-color: #64B5F6;
+  color: #1976D2;
+  background: linear-gradient(to right, #F0F7FF 0%, rgba(227, 242, 253, 0.5) 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
 }
 
 .notes-grid {
@@ -719,26 +814,29 @@ const removeFile = (index) => {
 }
 
 .note-card {
-  background-color: #f9f9f9;
-  padding: 16px;
-  border-radius: 10px;
-  border: 1px solid #eee;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9) 0%, rgba(248, 251, 255, 0.6) 100%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid rgba(144, 202, 249, 0.8);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  position: relative;
 }
 
 .note-card:hover {
-  border-color: #1976d2;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border-color: #2196F3;
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.25), 0 0 0 3px rgba(33, 150, 243, 0.15);
+  transform: translateY(-2px);
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
 }
 
 .note-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #1565C0;
 }
 
 .note-desc {
@@ -752,31 +850,32 @@ const removeFile = (index) => {
   color: #999;
 }
 
-/* 让科目卡片在小屏也保持舒适间距 */
 @media (max-width: 768px) {
   .subjects-grid {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
 
-/* 上传笔记区域样式 */
 .create-section {
-  background-color: #fff;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(33, 150, 243, 0.1);
+  border: 2px solid rgba(144, 202, 249, 0.8);
 }
 
 .drop-zone {
-  border: 2px dashed #d0d7de;
-  border-radius: 8px;
-  padding: 16px;
-  transition: border-color 0.2s, background-color 0.2s;
+  border: 2px dashed rgba(144, 202, 249, 0.5);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .drop-zone.is-dragging {
-  border-color: #1976d2;
-  background-color: #e3f2fd;
+  border-color: #64B5F6;
+  background: linear-gradient(to bottom, #E3F2FD 0%, rgba(187, 222, 251, 0.4) 100%);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
 }
 
 .drop-zone-inner {
@@ -799,17 +898,21 @@ const removeFile = (index) => {
 
 .look-btn {
   padding: 12px 24px;
-  background-color: #ff4081;
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
 }
 
 .look-btn:hover {
-  background-color: #e91e63;
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.4);
+  transform: translateY(-1px);
 }
 
 .create-hint {
@@ -825,24 +928,38 @@ const removeFile = (index) => {
 }
 
 .add-file-btn {
-  padding: 8px 16px;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 10px 18px;
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  border: 2px solid rgba(187, 222, 251, 0.8);
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
 .add-file-btn:hover {
-  background-color: #e0e0e0;
+  background: linear-gradient(to bottom, #E3F2FD 0%, #BBDEFB 100%);
+  border-color: #64B5F6;
+  color: #1565C0;
+  transform: translateY(-1px);
 }
 
 .repo-name-input {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 10px 14px;
+  border: 2px solid rgba(187, 222, 251, 0.6);
+  border-radius: 8px;
   font-size: 14px;
   min-width: 220px;
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
+}
+
+.repo-name-input:focus {
+  outline: none;
+  border-color: #64B5F6;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+  background: #FFFFFF;
 }
 
 .file-input-hidden {
@@ -904,11 +1021,12 @@ const removeFile = (index) => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px;
-  background-color: #e3f2fd;
-  border: 1px solid #90caf9;
-  border-radius: 8px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+  border: 1px solid rgba(144, 202, 249, 0.6);
+  border-radius: 12px;
   margin-top: 12px;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
 }
 
 .generating-spinner {
@@ -958,11 +1076,11 @@ const removeFile = (index) => {
   cursor: not-allowed;
 }
 
-/* 弹窗样式 */
 .modal-mask {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.25);
+  background-color: rgba(33, 150, 243, 0.2);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -970,19 +1088,21 @@ const removeFile = (index) => {
 }
 
 .modal-panel {
-  background-color: #fff;
-  border-radius: 12px;
-  padding: 20px 24px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  border-radius: 16px;
+  padding: 28px 32px;
+  box-shadow: 0 20px 60px rgba(33, 150, 243, 0.25);
   width: 420px;
   max-width: 90%;
+  border: 1px solid rgba(187, 222, 251, 0.6);
 }
 
 .modal-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: #333;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #1565C0;
+  letter-spacing: -0.3px;
 }
 
 .modal-field {
@@ -1001,12 +1121,14 @@ const removeFile = (index) => {
 .modal-textarea,
 .modal-select {
   width: 100%;
-  padding: 9px 12px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 2px solid rgba(187, 222, 251, 0.6);
   font-size: 14px;
   font-family: inherit;
   resize: vertical;
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
 }
 
 .modal-textarea {
@@ -1018,8 +1140,9 @@ const removeFile = (index) => {
 .modal-textarea:focus,
 .modal-select:focus {
   outline: none;
-  border-color: #1976d2;
-  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+  border-color: #64B5F6;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+  background: #FFFFFF;
 }
 
 .modal-actions {
@@ -1030,30 +1153,37 @@ const removeFile = (index) => {
 }
 
 .modal-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-  background-color: #fff;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 2px solid rgba(187, 222, 251, 0.8);
+  background-color: #FFFFFF;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
 .modal-btn.primary {
-  background-color: #1976d2;
-  border-color: #1976d2;
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+  border-color: #2196F3;
   color: #fff;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
 }
 
 .modal-btn.primary:hover {
-  background-color: #1565c0;
-  border-color: #1565c0;
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+  border-color: #1976D2;
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.4);
+  transform: translateY(-1px);
 }
 
 .modal-btn:not(.primary):hover {
-  border-color: #bbb;
+  border-color: #64B5F6;
+  background: linear-gradient(to right, #F0F7FF 0%, rgba(227, 242, 253, 0.5) 100%);
+  color: #1976D2;
+  transform: translateY(-1px);
 }
 
-/* 浮动创建按钮 */
 .fab {
   position: fixed;
   right: 32px;
@@ -1062,20 +1192,20 @@ const removeFile = (index) => {
   height: 56px;
   border-radius: 50%;
   border: none;
-  background-color: #1976d2;
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
   color: #fff;
   font-size: 32px;
   line-height: 56px;
   text-align: center;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+  box-shadow: 0 8px 24px rgba(33, 150, 243, 0.4);
+  transition: all 0.3s ease;
   z-index: 15;
 }
 
 .fab:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
-  background-color: #1565c0;
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 12px 32px rgba(33, 150, 243, 0.5);
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
 }
 </style>

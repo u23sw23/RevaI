@@ -1,6 +1,6 @@
 <template>
   <div class="profile-page">
-    <h2 class="page-title">个人信息</h2>
+    <h2 class="page-title">Personal Information</h2>
     
     <div class="profile-container">
       <div class="profile-card">
@@ -15,7 +15,7 @@
             <span v-else class="avatar-text">{{ userInfo.username?.charAt(0) || 'U' }}</span>
           </div>
           <label class="upload-avatar-btn" :class="{ uploading: uploadingAvatar }">
-            {{ uploadingAvatar ? '上传中...' : '上传头像' }}
+            {{ uploadingAvatar ? 'Uploading...' : 'Upload Avatar' }}
             <input
               type="file"
               ref="avatarInput"
@@ -29,7 +29,7 @@
         
         <div class="info-section">
           <div class="info-item">
-            <label>用户名</label>
+            <label>username</label>
             <input 
               type="text" 
               v-model="userInfo.username"
@@ -39,53 +39,53 @@
           </div>
           
           <div class="info-item">
-            <label>邮箱</label>
+            <label>email</label>
             <input 
               type="email" 
               v-model="userInfo.email"
               class="info-input"
-              placeholder="请输入邮箱"
+              placeholder="Enter your email"
             />
           </div>
           
           <div class="info-item">
-            <label>个人简介</label>
+            <label>bio</label>
             <textarea 
               v-model="userInfo.bio"
               class="info-textarea"
-              placeholder="介绍一下自己..."
+              placeholder="Introduce yourself..."
               rows="4"
             ></textarea>
           </div>
           
           <div class="info-item">
-            <label>创建时间</label>
+            <label>createTime</label>
             <div class="info-display">{{ userInfo.createTime }}</div>
           </div>
           
           <div class="info-item">
-            <label>已创建仓库数</label>
+            <label>repositoryCount</label>
             <div class="info-display">{{ userInfo.repositoryCount }}</div>
           </div>
         </div>
         
         <div class="action-section">
-          <button class="save-btn" @click="saveProfile">保存修改</button>
-          <button class="cancel-btn" @click="resetProfile">重置</button>
-          <button class="logout-btn" @click="logout">退出登录</button>
+          <button class="save-btn" @click="saveProfile">Save Changes</button>
+          <button class="cancel-btn" @click="resetProfile">Reset</button>
+          <button class="logout-btn" @click="logout">Logout</button>
         </div>
       </div>
       
       <div class="stats-card">
-        <h3>统计信息</h3>
+        <h3>Statistics</h3>
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-value">{{ userInfo.repositoryCount }}</div>
-            <div class="stat-label">仓库数</div>
+            <div class="stat-label">repositoryCount</div>
           </div>
           <div class="stat-item">
             <div class="stat-value">{{ userInfo.groupCount }}</div>
-            <div class="stat-label">加入群组</div>
+            <div class="stat-label">groupCount</div>
           </div>
         </div>
       </div>
@@ -100,7 +100,6 @@ import { api } from '../utils/api'
 
 const router = useRouter()
 
-// 从 Layout 传入的当前用户信息（来源于登录/注册成功或本地存储）
 const props = defineProps({
   user: {
     type: Object,
@@ -108,7 +107,6 @@ const props = defineProps({
   }
 })
 
-// 当前页面编辑态下的用户信息
 const userInfo = ref({
   id: null,
   username: '',
@@ -125,13 +123,12 @@ const loading = ref(false)
 const uploadingAvatar = ref(false)
 const avatarInput = ref(null)
 
-// 获取当前用户ID
 const getCurrentUserId = () => {
-  // 优先从 props.user 获取
+  
   if (props.user && props.user.id) {
     return props.user.id
   }
-  // 从 localStorage 获取
+  
   const savedUser = localStorage.getItem('auth_user')
   if (savedUser) {
     try {
@@ -144,7 +141,6 @@ const getCurrentUserId = () => {
   return null
 }
 
-// 从后端 API 加载用户信息和统计数据
 const loadUserProfile = async () => {
   const userId = getCurrentUserId()
   if (!userId) {
@@ -155,7 +151,7 @@ const loadUserProfile = async () => {
   loading.value = true
   try {
     const profile = await api.getUserProfile(userId)
-    // 映射后端字段到前端字段
+    
     userInfo.value = {
       id: profile.id,
       username: profile.username || '',
@@ -167,22 +163,21 @@ const loadUserProfile = async () => {
       groupCount: profile.groupCount || 0
     }
     originalInfo.value = JSON.parse(JSON.stringify(userInfo.value))
-    // 同步更新本地存储（兼容旧格式，添加 name 字段用于其他组件）
+    
     const savedData = {
       ...userInfo.value,
-      name: userInfo.value.username // 兼容其他组件使用的 name 字段
+      name: userInfo.value.username 
     }
     localStorage.setItem('auth_user', JSON.stringify(savedData))
   } catch (error) {
     console.error('Failed to load user profile:', error)
-    // 如果API失败，回退到从localStorage加载
+    
     initUserInfoFromLocal()
   } finally {
     loading.value = false
   }
 }
 
-// 从本地存储初始化（作为回退方案）
 const initUserInfoFromLocal = () => {
   const savedUser = localStorage.getItem('auth_user')
   if (savedUser) {
@@ -209,7 +204,6 @@ onMounted(() => {
   loadUserProfile()
 })
 
-// 当父组件传入的 user 变化时，重新加载
 watch(
   () => props.user,
   () => {
@@ -218,40 +212,35 @@ watch(
   { deep: true }
 )
 
-// 获取头像完整URL
 const getAvatarUrl = (avatar) => {
   if (!avatar) return ''
-  // 如果已经是完整URL，直接返回
+  
   if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
     return avatar
   }
-  // 如果是相对路径，添加后端地址
+  
   if (avatar.startsWith('/')) {
     return `http://localhost:8080${avatar}`
   }
   return avatar
 }
 
-// 处理图片加载错误
 const handleImageError = (event) => {
-  // 如果图片加载失败，隐藏图片，显示默认头像
+  
   event.target.style.display = 'none'
 }
 
-// 处理头像文件选择
 const handleAvatarChange = async (event) => {
   const file = event.target.files?.[0]
   if (!file) {
     return
   }
 
-  // 验证文件类型
   if (!file.type.startsWith('image/')) {
     alert('只能上传图片文件')
     return
   }
 
-  // 验证文件大小（限制为 5MB）
   if (file.size > 5 * 1024 * 1024) {
     alert('图片大小不能超过 5MB')
     return
@@ -270,12 +259,10 @@ const handleAvatarChange = async (event) => {
     formData.append('userId', userId.toString())
 
     const avatarUrl = await api.uploadAvatar(userId, file)
-    
-    // 更新用户信息中的头像
+
     userInfo.value.avatar = avatarUrl
     originalInfo.value.avatar = avatarUrl
-    
-    // 同步更新本地存储
+
     const savedData = {
       ...userInfo.value,
       name: userInfo.value.username
@@ -288,7 +275,7 @@ const handleAvatarChange = async (event) => {
     alert('头像上传失败：' + (error.message || '未知错误'))
   } finally {
     uploadingAvatar.value = false
-    // 清空文件输入，允许重复选择同一文件
+    
     if (avatarInput.value) {
       avatarInput.value.value = ''
     }
@@ -304,7 +291,7 @@ const saveProfile = async () => {
 
   loading.value = true
   try {
-    // 准备要保存的数据（只包含后端可更新的字段）
+    
     const updateData = {
       username: userInfo.value.username,
       email: userInfo.value.email,
@@ -313,7 +300,7 @@ const saveProfile = async () => {
     }
 
     const updated = await api.updateUserProfile(userId, updateData)
-    // 更新用户信息（保留统计数据）
+    
     userInfo.value = {
       ...userInfo.value,
       username: updated.username || userInfo.value.username,
@@ -322,10 +309,10 @@ const saveProfile = async () => {
       avatar: updated.avatar || userInfo.value.avatar
     }
     originalInfo.value = JSON.parse(JSON.stringify(userInfo.value))
-    // 同步更新本地存储（兼容旧格式）
+    
     const savedData = {
       ...userInfo.value,
-      name: userInfo.value.username // 兼容其他组件使用的 name 字段
+      name: userInfo.value.username 
     }
     localStorage.setItem('auth_user', JSON.stringify(savedData))
     alert('保存成功！')
@@ -341,12 +328,11 @@ const resetProfile = () => {
   userInfo.value = JSON.parse(JSON.stringify(originalInfo.value))
 }
 
-// 退出登录：清除本地登录状态并回到游客视图
 const logout = () => {
-  // 清除 TopHeader 使用的本地登录标记（如有 token 也可一并清除）
+  
   localStorage.removeItem('auth_username')
   localStorage.removeItem('auth_user')
-  // 根据需要可清空本地用户信息
+  
   userInfo.value = {
     id: null,
     username: '',
@@ -357,7 +343,7 @@ const logout = () => {
     repositoryCount: 0,
     groupCount: 0
   }
-  // 跳转回首页（或任意页面），并刷新一次让 TopHeader 重新以游客状态渲染
+  
   router.push('/repositories').then(() => {
     window.location.reload()
   })
@@ -372,10 +358,14 @@ const logout = () => {
 }
 
 .page-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1976D2 0%, #2196F3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 8px;
+  letter-spacing: -0.5px;
 }
 
 .profile-container {
@@ -385,10 +375,11 @@ const logout = () => {
 }
 
 .profile-card {
-  background-color: #fff;
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
   padding: 32px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(33, 150, 243, 0.1);
+  border: 2px solid rgba(71, 169, 249, 0.8);
 }
 
 .avatar-section {
@@ -404,12 +395,14 @@ const logout = () => {
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background-color: #e0e0e0;
+  background: linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
   overflow: hidden;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+  border: 3px solid rgba(255, 255, 255, 0.8);
 }
 
 .avatar-large img {
@@ -425,17 +418,22 @@ const logout = () => {
 }
 
 .upload-avatar-btn {
-  padding: 8px 16px;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 10px 20px;
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  border: 2px solid rgba(187, 222, 251, 0.8);
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
 .upload-avatar-btn:hover:not(.uploading) {
-  background-color: #e0e0e0;
+  background: linear-gradient(to bottom, #E3F2FD 0%, #BBDEFB 100%);
+  border-color: #64B5F6;
+  color: #1565C0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
 }
 
 .upload-avatar-btn.uploading {
@@ -464,19 +462,21 @@ const logout = () => {
 
 .info-input,
 .info-textarea {
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 10px 14px;
+  border: 2px solid rgba(187, 222, 251, 0.6);
+  border-radius: 10px;
   font-size: 14px;
   font-family: inherit;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .info-input:focus,
 .info-textarea:focus {
   outline: none;
-  border-color: #1976d2;
-  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+  border-color: #64B5F6;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+  background: #FFFFFF;
 }
 
 .info-textarea {
@@ -484,11 +484,12 @@ const logout = () => {
 }
 
 .info-display {
-  padding: 10px 12px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
+  padding: 10px 14px;
+  background: linear-gradient(to bottom, #F8FBFF 0%, rgba(227, 242, 253, 0.4) 100%);
+  border-radius: 10px;
   font-size: 14px;
-  color: #666;
+  color: #546E7A;
+  border: 1px solid rgba(187, 222, 251, 0.6);
 }
 
 .action-section {
@@ -500,61 +501,73 @@ const logout = () => {
 
 .save-btn,
 .cancel-btn {
-  padding: 10px 24px;
-  border-radius: 4px;
+  padding: 12px 24px;
+  border-radius: 10px;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   border: none;
+  font-weight: 500;
 }
 
 .save-btn {
-  background-color: #1976d2;
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
   color: white;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
 }
 
 .save-btn:hover {
-  background-color: #1565c0;
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.4);
+  transform: translateY(-1px);
 }
 
 .cancel-btn {
-  background-color: #f5f5f5;
-  color: #666;
-  border: 1px solid #ddd;
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  color: #546E7A;
+  border: 2px solid rgba(187, 222, 251, 0.8);
 }
 
 .cancel-btn:hover {
-  background-color: #e0e0e0;
+  background: linear-gradient(to bottom, #E3F2FD 0%, #BBDEFB 100%);
+  border-color: #64B5F6;
+  color: #1565C0;
+  transform: translateY(-1px);
 }
 
 .logout-btn {
-  padding: 10px 24px;
-  border-radius: 4px;
+  padding: 12px 24px;
+  border-radius: 10px;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid #f44336;
-  background-color: #fff;
-  color: #f44336;
+  transition: all 0.3s ease;
+  border: 2px solid rgba(244, 67, 54, 0.6);
+  background: linear-gradient(to bottom, #FFFFFF 0%, rgba(255, 235, 238, 0.4) 100%);
+  color: #F44336;
+  font-weight: 500;
 }
 
 .logout-btn:hover {
-  background-color: #ffebee;
+  background: linear-gradient(to bottom, #FFEBEE 0%, #FFCDD2 100%);
+  border-color: #E53935;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.2);
 }
 
 .stats-card {
-  background-color: #fff;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(33, 150, 243, 0.1);
   height: fit-content;
 }
 
 .stats-card h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 20px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1565C0;
+  margin-bottom: 24px;
+  letter-spacing: -0.3px;
 }
 
 .stats-grid {
@@ -565,16 +578,21 @@ const logout = () => {
 
 .stat-item {
   text-align: center;
-  padding: 16px;
-  background-color: #f5f5f5;
-  border-radius: 8px;
+  padding: 20px;
+  background: linear-gradient(to bottom, #F8FBFF 0%, rgba(227, 242, 253, 0.4) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(187, 222, 251, 0.6);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.08);
 }
 
 .stat-value {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1976d2;
-  margin-bottom: 4px;
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #1976D2 0%, #2196F3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
 }
 
 .stat-label {

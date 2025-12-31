@@ -42,3 +42,13 @@ dist
 .env
 .env.local
 .env.*.local
+
+### Application Secrets ###
+src/main/resources/application-local.properties
+uploads/
+server/uploads/
+frontend/server/uploads/
+
+### Database ###
+*.db
+*.sqlite

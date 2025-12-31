@@ -3,7 +3,9 @@ import Layout from '../components/Layout/Layout.vue'
 import Repositories from '../views/Repositories.vue'
 import RepositoryDetail from '../views/RepositoryDetail.vue'
 import Exam from '../views/Exam.vue'
+import Review from '../views/Review.vue'
 import Group from '../views/Group.vue'
+import GroupDetail from '../views/GroupDetail.vue'
 import Profile from '../views/Profile.vue'
 import Community from '../views/Community.vue'
 
@@ -33,9 +35,20 @@ const routes = [
         component: Exam
       },
       {
+        path: 'review',
+        name: 'Review',
+        component: Review
+      },
+      {
         path: 'group',
         name: 'Group',
         component: Group
+      },
+      {
+        path: 'group/:id',
+        name: 'GroupDetail',
+        component: GroupDetail,
+        props: true
       },
       {
         path: 'profile',

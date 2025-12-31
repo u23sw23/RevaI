@@ -3,20 +3,17 @@ package com.example.demo.entity;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 科目实体类
- */
 public class Subject {
     private Long id;
     private String name;
     private String description;
     private Long userId;
-    private String visibility; // public or private
+    private String visibility; 
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private List<Note> notes;
     private String creatorUsername;
-    // Getters and Setters
+    
     public Long getId() {
         return id;
     }

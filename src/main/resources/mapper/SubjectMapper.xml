@@ -35,8 +35,32 @@
         ORDER BY s.update_time DESC
     </select>
     
+    <select id="searchPublic" resultMap="SubjectWithCreatorResultMap">
+        SELECT s.*, u.username as creator_username
+        FROM subjects s
+        INNER JOIN users u ON s.user_id = u.id
+        WHERE s.visibility = 'public'
+        AND (s.name LIKE CONCAT('%', #{keyword}, '%') OR s.description LIKE CONCAT('%', #{keyword}, '%'))
+        ORDER BY s.update_time DESC
+        LIMIT 10
+    </select>
+    
     <select id="findById" resultMap="SubjectResultMap">
         SELECT * FROM subjects WHERE id = #{id}
+    </select>
+    
+    <select id="findByNameAndUserId" resultMap="SubjectResultMap">
+        SELECT * FROM subjects WHERE name = #{name} AND user_id = #{userId} LIMIT 1
+    </select>
+    
+    <select id="findByGroupCreatorIds" resultMap="SubjectResultMap">
+        SELECT * FROM subjects 
+        WHERE user_id IN 
+        <foreach item="creatorId" collection="creatorIds" open="(" separator="," close=")">
+            #{creatorId}
+        </foreach>
+        AND name LIKE CONCAT(#{namePrefix}, '%')
+        ORDER BY update_time DESC
     </select>
     
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">

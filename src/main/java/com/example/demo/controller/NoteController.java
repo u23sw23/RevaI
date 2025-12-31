@@ -64,8 +64,7 @@ public class NoteController {
             @RequestParam(required = false) MultipartFile[] files) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // TODO: 处理文件上传和AI生成笔记的逻辑
-            // 这里暂时返回模拟数据，实际应该处理文件并调用AI服务
+
             Note note = new Note();
             note.setTitle(noteName);
             note.setContent("AI生成的笔记内容...（待实现文件处理和AI生成功能）");
@@ -77,7 +76,6 @@ public class NoteController {
             response.put("data", created);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
             response.put("success", false);
             response.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(response);

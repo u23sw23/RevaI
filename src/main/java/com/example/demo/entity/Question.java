@@ -2,21 +2,17 @@ package com.example.demo.entity;
 
 import java.util.List;
 
-/**
- * 题目实体类
- */
 public class Question {
     private Long id;
-    private Long examId; // 所属考试ID
-    private String title; // 题目内容
-    private String type; // 题目类型：single_choice, open_question
-    private Integer points; // 分值
-    private List<Option> options; // 选项（仅选择题有）
-    private String correctAnswer; // 正确答案
-    private String explanation; // 题目解析
-    private String optionsJson; // JSON格式的选项（用于数据库存储）
+    private Long examId; 
+    private String title; 
+    private String type; 
+    private Integer points; 
+    private List<Option> options; 
+    private String correctAnswer; 
+    private String explanation; 
+    private String optionsJson; 
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

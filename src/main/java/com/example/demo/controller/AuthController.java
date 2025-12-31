@@ -45,18 +45,17 @@ public class AuthController {
             
             response.put("success", true);
             response.put("user", user);
-            response.put("token", "mock_token_" + user.getId()); // 实际项目中应使用JWT
+            response.put("token", "mock_token_" + user.getId()); 
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace(); // 打印异常堆栈，便于调试
             response.put("success", false);
             String errorMessage = e.getMessage();
             if (errorMessage == null || errorMessage.isEmpty()) {
                 errorMessage = "注册失败：" + e.getClass().getSimpleName();
             }
             response.put("message", errorMessage);
-            // 500错误时也返回JSON，而不是让Spring Boot返回默认错误页面
+            
             return ResponseEntity.status(500).body(response);
         }
     }
@@ -72,18 +71,17 @@ public class AuthController {
             
             response.put("success", true);
             response.put("user", user);
-            response.put("token", "mock_token_" + user.getId()); // 实际项目中应使用JWT
+            response.put("token", "mock_token_" + user.getId()); 
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace(); // 打印异常堆栈，便于调试
             response.put("success", false);
             String errorMessage = e.getMessage();
             if (errorMessage == null || errorMessage.isEmpty()) {
                 errorMessage = "登录失败：" + e.getClass().getSimpleName();
             }
             response.put("message", errorMessage);
-            // 500错误时也返回JSON，而不是让Spring Boot返回默认错误页面
+            
             return ResponseEntity.status(500).body(response);
         }
     }

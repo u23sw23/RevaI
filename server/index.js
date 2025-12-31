@@ -1,15 +1,4 @@
-/**
- * AI 小精灵后端服务
- *
- * 功能：
- * 1. 代理 DeepSeek API 请求，保护 API Key 安全
- * 2. 文件上传 + AI 生成笔记
- *
- * 启动方式：
- *   1. 先创建 .env 文件，填入 DEEPSEEK_API_KEY
- *   2. npm install
- *   3. npm start
- */
+
 
 import express from 'express'
 import cors from 'cors'
@@ -25,7 +14,6 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// 从环境变量读取 API Key（安全！）
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
 
 if (!DEEPSEEK_API_KEY) {
@@ -34,19 +22,17 @@ if (!DEEPSEEK_API_KEY) {
   process.exit(1)
 }
 
-// 创建上传目录
 const uploadDir = path.join(__dirname, 'uploads')
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true })
 }
 
-// 配置 multer 文件上传
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir)
   },
   filename: (req, file, cb) => {
-    // 处理中文文件名
+    
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8')
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
     const ext = path.extname(originalName)
@@ -56,24 +42,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB 限制
-  // 先尽量放宽类型限制，避免前端上传时报错导致返回 HTML
+  limits: { fileSize: 10 * 1024 * 1024 }, 
+  
 })
 
-// 中间件
-app.use(cors()) // 允许跨域（前端调用需要）
-app.use(express.json()) // 解析 JSON 请求体
+app.use(cors()) 
+app.use(express.json()) 
 
-/**
- * AI 聊天接口
- *
- * 请求格式：
- * POST /api/ai/chat
- * Body: { "messages": [{ "role": "user", "content": "你好" }, ...] }
- *
- * 返回格式：
- * { "content": "AI 的回复内容" }
- */
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { messages } = req.body
@@ -82,8 +57,7 @@ app.post('/api/ai/chat', async (req, res) => {
     }
     console.log(`📨 收到请求，消息数量: ${messages.length}`)
 
-    // 调用 DeepSeek API
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const response = await fetch('https:
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
@@ -118,7 +92,7 @@ app.post('/api/ai/chat', async (req, res) => {
     }
 
     console.log(`✅ AI 回复成功，长度: ${content.length} 字符`)
-    // 返回给前端
+    
     res.json({ content })
   } catch (error) {
     console.error('❌ 服务器错误:', error.message)
@@ -129,41 +103,36 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 })
 
-// 健康检查接口
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'AI 小精灵后端服务运行中' })
 })
 
-/**
- * 读取文件内容（支持 txt、md、pdf，扩展支持 ppt/pptx）
- */
 async function readFileContent(filePath, mimetype) {
   try {
     if (mimetype === 'text/plain' || mimetype === 'text/markdown' || filePath.endsWith('.md')) {
       return fs.readFileSync(filePath, 'utf-8')
     }
     if (mimetype === 'application/pdf') {
-      // 动态导入 pdf-parse
+      
       const pdfParse = (await import('pdf-parse')).default
       const dataBuffer = fs.readFileSync(filePath)
       const data = await pdfParse(dataBuffer)
       return data.text
     }
-    // PPT / PPTX：尝试解析文本内容（需要在 server 目录安装 pptx-parser 或类似库）
+    
     if (
       filePath.endsWith('.ppt') ||
       filePath.endsWith('.pptx') ||
       mimetype.includes('presentation')
     ) {
       try {
-        // 这里使用动态导入的方式，避免在未安装依赖时导致整个服务崩溃
-        // 建议在 server 目录执行：npm install pptx-parser
+
         const pptxParser = (await import('pptx-parser')).default
         const result = await pptxParser(filePath)
-        // 不同库的返回结构可能不同，这里做一个尽量安全的提取
+        
         const texts = []
         if (Array.isArray(result)) {
-          // 形如 [{text: '...'}, ...]
+          
           result.forEach((item) => {
             if (item && typeof item.text === 'string') {
               texts.push(item.text)
@@ -182,15 +151,15 @@ async function readFileContent(filePath, mimetype) {
         if (joined) return joined
       } catch (e) {
         console.error('PPT 解析失败:', e.message)
-        // 解析失败时继续走下面逻辑，最终会提示用户转换格式
+        
       }
       return '[PPT 文件暂未能正确解析，请优先尝试将 PPT 导出为 PDF 或 TXT 上传。]'
     }
-    // 对于图片，返回提示信息（后续可以接入 OCR）
+    
     if (mimetype.startsWith('image/')) {
       return '[图片文件，暂不支持自动提取文字，请手动输入关键内容]'
     }
-    // doc/docx 暂时返回提示
+    
     if (mimetype.includes('word') || mimetype.includes('document')) {
       return '[Word 文件，建议转为 PDF 或 TXT 格式上传]'
     }
@@ -201,19 +170,6 @@ async function readFileContent(filePath, mimetype) {
   }
 }
 
-/**
- * 文件上传 + AI 生成笔记接口
- *
- * 请求格式：
- * POST /api/ai/generate-note
- * Content-Type: multipart/form-data
- * - files: 上传的文件（支持多个）
- * - noteName: 笔记名称
- * - subjectName: 科目名称
- *
- * 返回格式：
- * { "note": { "title": "...", "content": "..." } }
- */
 app.post('/api/ai/generate-note', upload.array('files', 10), async (req, res) => {
   try {
     const files = req.files || []
@@ -225,7 +181,6 @@ app.post('/api/ai/generate-note', upload.array('files', 10), async (req, res) =>
 
     console.log(`📁 收到 ${files.length} 个文件，准备生成笔记...`)
 
-    // 读取所有文件内容
     let allContent = ''
     for (const file of files) {
       const content = await readFileContent(file.path, file.mimetype)
@@ -233,11 +188,11 @@ app.post('/api/ai/generate-note', upload.array('files', 10), async (req, res) =>
         const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8')
         allContent += `\n\n--- 文件: ${originalName} ---\n${content}`
       }
-      // 删除临时文件
+      
       try {
         fs.unlinkSync(file.path)
       } catch (e) {
-        // ignore
+        
       }
     }
 
@@ -245,7 +200,6 @@ app.post('/api/ai/generate-note', upload.array('files', 10), async (req, res) =>
       return res.status(400).json({ error: '无法读取文件内容，请检查文件格式' })
     }
 
-    // 构建 AI 提示词，生成结构化笔记（更详细，但仍尽量写完）
     const systemPrompt = `You are a professional study assistant specializing in creating high-quality, **detailed and complete** study notes.
 
 Your task is to transform the user's study materials into **well-structured, exam-ready notes**.
@@ -297,8 +251,7 @@ Make sure all important concepts are included, and explain each important point 
 
     console.log('🤖 正在调用 AI 生成笔记...')
 
-    // 调用 DeepSeek API 生成笔记
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const response = await fetch('https:
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
@@ -313,7 +266,7 @@ Make sure all important concepts are included, and explain each important point 
             { role: 'user', content: userPrompt },
           ],
           max_tokens: 8192,
-          temperature: 0.3, // 低温度，输出更稳定
+          temperature: 0.3, 
         }),
         'utf8'
       ),
@@ -338,7 +291,6 @@ Make sure all important concepts are included, and explain each important point 
 
     console.log(`✅ 笔记生成成功，长度: ${noteContent.length} 字符`)
 
-    // 返回生成的笔记
     res.json({
       note: {
         title: noteName || '学习笔记',
@@ -356,27 +308,13 @@ Make sure all important concepts are included, and explain each important point 
   }
 })
 
-/**
- * AI 生成测试题接口
- *
- * 请求格式：
- * POST /api/ai/generate-exam
- * Body: {
- *   noteContent: string,      // 笔记内容（Markdown 或纯文本）
- *   questionCount: number,    // 期望题目数量
- *   difficulty: 'easy' | 'medium' | 'hard'
- * }
- *
- * 返回格式：
- * { questions: [ { id, type, stem, options?, answer, explanation?, points } ] }
- */
 app.post('/api/ai/generate-exam', async (req, res) => {
   try {
     const {
       noteContent,
       questionCount = 8,
       difficulty = 'medium',
-      // 由前端传入的期望题型（仅作为提示，不改变输出 JSON 结构）
+      
       selectedTypes = ['single', 'true-false', 'open'],
     } = req.body || {}
 
@@ -446,7 +384,7 @@ Return ONLY JSON following the schema above. Do NOT wrap it in markdown or add a
 
     console.log('🤖 正在调用 AI 生成试卷...')
 
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const response = await fetch('https:
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
@@ -486,13 +424,13 @@ Return ONLY JSON following the schema above. Do NOT wrap it in markdown or add a
 
     let parsed
     try {
-      // 有些情况下模型会包一层 ```json ```，或在前后加说明文字，这里做一次“提纯”
+      
       let cleaned = String(raw).trim()
-      // 去掉 markdown 代码块包裹
+      
       if (cleaned.startsWith('```')) {
         cleaned = cleaned.replace(/^```[a-zA-Z]*\s*/, '').replace(/```$/, '').trim()
       }
-      // 只截取第一个 { 到 最后一个 } 之间的内容，防止前后有额外文字
+      
       const firstBrace = cleaned.indexOf('{')
       const lastBrace = cleaned.lastIndexOf('}')
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
@@ -521,18 +459,16 @@ Return ONLY JSON following the schema above. Do NOT wrap it in markdown or add a
   }
 })
 
-// 统一错误处理中间件（确保返回 JSON，而不是 HTML）
 app.use((err, req, res, next) => {
   console.error('全局错误捕获:', err.message)
   res.status(500).json({ error: err.message || '服务器内部错误' })
 })
 
-// 启动服务器
 app.listen(PORT, () => {
   console.log('')
   console.log('🤖 AI 小精灵后端服务已启动')
-  console.log(`📍 地址: http://localhost:${PORT}`)
-  console.log(`🔗 AI 接口: http://localhost:${PORT}/api/ai/chat`)
+  console.log(`📍 地址: http:
+  console.log(`🔗 AI 接口: http:
   console.log('')
   console.log('✅ API Key 已从环境变量加载（安全）')
   console.log('')

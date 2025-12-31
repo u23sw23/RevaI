@@ -14,7 +14,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+
 import com.example.demo.entity.Group;
+import com.example.demo.entity.Subject;
+import com.example.demo.mapper.NoteMapper;
+import com.example.demo.mapper.SubjectMapper;
 import com.example.demo.service.GroupService;
 
 @RestController
@@ -22,6 +27,12 @@ import com.example.demo.service.GroupService;
 public class GroupController {
     @Autowired
     private GroupService groupService;
+    
+    @Autowired
+    private SubjectMapper subjectMapper;
+    
+    @Autowired
+    private NoteMapper noteMapper;
     @GetMapping
     public ResponseEntity<Map<String, Object>> getGroups(
             @RequestParam(required = false) Long userId,
@@ -73,8 +84,7 @@ public class GroupController {
         try {
             Group group = new Group();
             group.setName((String) request.get("name"));
-            
-            // 从请求参数或请求体中获取creatorId
+
             Long creatorId = userId;
             if (creatorId == null && request.get("creatorId") != null) {
                 creatorId = Long.valueOf(request.get("creatorId").toString());
@@ -106,13 +116,12 @@ public class GroupController {
 
     @PostMapping("/join")
     public ResponseEntity<Map<String, Object>> joinGroup(
-            @RequestBody Map<String, Object> request,  //接收json格式body数据
-            @RequestParam(required = false) Long userId) { //接收url参数（包含?userId=123）
+            @RequestBody Map<String, Object> request,  
+            @RequestParam(required = false) Long userId) { 
         Map<String, Object> response = new HashMap<>();
         try {
             Long groupId = Long.valueOf(request.get("groupId").toString());
-            
-            // 从请求参数或请求体中获取userId
+
             Long currentUserId = userId;
             if (currentUserId == null && request.get("userId") != null) {
                 currentUserId = Long.valueOf(request.get("userId").toString());
@@ -123,6 +132,85 @@ public class GroupController {
             
             groupService.joinGroup(groupId, currentUserId);
             response.put("success", true);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/{id}/subject")
+    public ResponseEntity<Map<String, Object>> getGroupSharedSubject(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Group group = groupService.getGroupById(id);
+            if (group == null) {
+                response.put("success", false);
+                response.put("message", "Group not found");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            String subjectName = "Group: " + group.getName();
+            Subject subject = subjectMapper.findByNameAndUserId(subjectName, group.getCreatorId());
+            
+            if (subject != null) {
+                
+                subject.setNotes(noteMapper.findBySubjectId(subject.getId()));
+                response.put("success", true);
+                response.put("data", subject);
+            } else {
+                response.put("success", true);
+                response.put("data", null);
+            }
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/{id}/subject")
+    public ResponseEntity<Map<String, Object>> createGroupSharedSubject(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Group group = groupService.getGroupById(id);
+            if (group == null) {
+                response.put("success", false);
+                response.put("message", "Group not found");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            String subjectName = "Group: " + group.getName();
+            Subject existingSubject = subjectMapper.findByNameAndUserId(subjectName, group.getCreatorId());
+            if (existingSubject != null) {
+                
+                existingSubject.setNotes(noteMapper.findBySubjectId(existingSubject.getId()));
+                response.put("success", true);
+                response.put("data", existingSubject);
+                return ResponseEntity.ok(response);
+            }
+
+            Subject subject = new Subject();
+            subject.setName((String) request.getOrDefault("name", subjectName));
+            subject.setDescription((String) request.getOrDefault("description", "Shared workspace for group \"" + group.getName() + "\""));
+            subject.setUserId(group.getCreatorId());
+            subject.setVisibility("private");
+            subject.setCreateTime(LocalDateTime.now());
+            subject.setUpdateTime(LocalDateTime.now());
+            
+            subjectMapper.insert(subject);
+
+            Subject createdSubject = subjectMapper.findById(subject.getId());
+            if (createdSubject != null) {
+                createdSubject.setNotes(noteMapper.findBySubjectId(createdSubject.getId()));
+            }
+            
+            response.put("success", true);
+            response.put("data", createdSubject);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);

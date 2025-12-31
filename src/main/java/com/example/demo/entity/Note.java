@@ -2,19 +2,15 @@ package com.example.demo.entity;
 
 import java.time.LocalDateTime;
 
-/**
- * 笔记实体类
- */
 public class Note {
     private Long id;
     private String title;
     private String content;
-    private Long subjectId; // 所属科目ID
-    private Long userId; // 创建者ID
+    private Long subjectId; 
+    private Long userId; 
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

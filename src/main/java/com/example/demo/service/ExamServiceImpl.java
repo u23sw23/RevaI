@@ -2,11 +2,15 @@ package com.example.demo.service;
 
 import com.example.demo.entity.Exam;
 import com.example.demo.entity.ExamAnswer;
+import com.example.demo.entity.ExamAttempt;
+import com.example.demo.entity.ExamSM2Stats;
 import com.example.demo.entity.Note;
 import com.example.demo.entity.Option;
 import com.example.demo.entity.Question;
 import com.example.demo.mapper.ExamAnswerMapper;
+import com.example.demo.mapper.ExamAttemptMapper;
 import com.example.demo.mapper.ExamMapper;
+import com.example.demo.mapper.ExamSM2StatsMapper;
 import com.example.demo.mapper.NoteMapper;
 import com.example.demo.mapper.QuestionMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -15,6 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -29,6 +35,12 @@ public class ExamServiceImpl implements ExamService {
 
     @Autowired
     private ExamAnswerMapper examAnswerMapper;
+
+    @Autowired
+    private ExamAttemptMapper examAttemptMapper;
+
+    @Autowired
+    private ExamSM2StatsMapper examSM2StatsMapper;
 
     @Autowired
     private NoteMapper noteMapper;
@@ -49,7 +61,7 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public List<Exam> getExamsByNoteId(Long noteId) {
         List<Exam> exams = examMapper.findByNoteId(noteId);
-        // 为每个考试加载题目
+        
         for (Exam exam : exams) {
             exam.setQuestions(getExamQuestions(exam.getId()));
         }
@@ -68,18 +80,16 @@ public class ExamServiceImpl implements ExamService {
     @Override
     @Transactional
     public Exam createExamFromAI(Long noteId, Long userId, String noteContent, int questionCount, String difficulty, List<Map<String, Object>> aiQuestions, String examName) {
-        // aiQuestions 由Controller层传入，这里只负责保存到数据库
+        
         if (aiQuestions == null || aiQuestions.isEmpty()) {
             throw new RuntimeException("AI未返回任何题目");
         }
 
-        // 获取笔记信息
         Note note = noteMapper.findById(noteId);
         if (note == null) {
             throw new RuntimeException("笔记不存在");
         }
 
-        // 创建Exam记录
         Exam exam = new Exam();
         if (examName != null && !examName.trim().isEmpty()) {
             exam.setTitle(examName);
@@ -93,14 +103,12 @@ public class ExamServiceImpl implements ExamService {
         exam.setUpdateTime(LocalDateTime.now());
         examMapper.insert(exam);
 
-        // 保存题目
         List<Question> questions = new ArrayList<>();
         for (Map<String, Object> q : aiQuestions) {
             Question question = new Question();
             question.setExamId(exam.getId());
             question.setTitle((String) q.get("stem"));
-            
-            // 转换题目类型
+
             String type = (String) q.get("type");
             if ("single".equals(type)) {
                 question.setType("single_choice");
@@ -115,8 +123,7 @@ public class ExamServiceImpl implements ExamService {
             question.setPoints(((Number) q.getOrDefault("points", 5)).intValue());
             question.setCorrectAnswer((String) q.get("answer"));
             question.setExplanation((String) q.getOrDefault("explanation", ""));
-            
-            // 处理选项（如果有）
+
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> optionsData = (List<Map<String, Object>>) q.get("options");
             if (optionsData != null && !optionsData.isEmpty()) {
@@ -131,15 +138,14 @@ public class ExamServiceImpl implements ExamService {
                 }
                 question.setOptions(options);
             } else if ("true_false".equals(question.getType())) {
-                // 判断题自动生成选项
+                
                 List<Option> options = Arrays.asList(
                     new Option("True", "A", "True"),
                     new Option("False", "B", "False")
                 );
                 question.setOptions(options);
             }
-            
-            // 将选项序列化为JSON并插入
+
             insertQuestionWithOptions(question);
             questions.add(question);
         }
@@ -151,35 +157,28 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public List<Question> getExamQuestions(Long examId) {
         List<Question> questions = questionMapper.findByExamId(examId);
-        // 从JSON字段解析选项
+        
         for (Question q : questions) {
             parseOptionsFromJson(q);
         }
         return questions;
     }
 
-    /**
-     * 插入题目并处理选项的JSON序列化
-     */
     private void insertQuestionWithOptions(Question question) {
         try {
-            // 将选项序列化为JSON
+            
             String optionsJson = null;
             if (question.getOptions() != null && !question.getOptions().isEmpty()) {
                 optionsJson = objectMapper.writeValueAsString(question.getOptions());
             }
             question.setOptionsJson(optionsJson);
-            
-            // 使用标准的insert方法
+
             questionMapper.insert(question);
         } catch (Exception e) {
             throw new RuntimeException("保存题目失败: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * 从JSON字段解析选项
-     */
     private void parseOptionsFromJson(Question question) {
         if (question.getOptionsJson() != null && !question.getOptionsJson().trim().isEmpty()) {
             try {
@@ -198,8 +197,7 @@ public class ExamServiceImpl implements ExamService {
                 }
                 question.setOptions(options);
             } catch (Exception e) {
-                // JSON解析失败，保持options为null
-                System.err.println("解析选项JSON失败: " + e.getMessage());
+                
             }
         }
     }
@@ -207,12 +205,9 @@ public class ExamServiceImpl implements ExamService {
     @Override
     @Transactional
     public Long saveUserAnswers(Long examId, Long userId, Map<Long, String> answers, Long attemptId) {
-        // 如果没有attemptId，使用当前时间作为attempt标识
+        
         LocalDateTime submitTime = LocalDateTime.now();
-        
-        // 如果提供了attemptId，尝试从现有答案中获取submitTime（简化处理，实际应该从attempt表获取）
-        // 这里为了简化，每次保存都使用当前时间，提交时才统一时间
-        
+
         for (Map.Entry<Long, String> entry : answers.entrySet()) {
             ExamAnswer existing = examAnswerMapper.findByExamIdAndUserIdAndQuestionId(
                 examId, userId, entry.getKey());
@@ -231,9 +226,7 @@ public class ExamServiceImpl implements ExamService {
                 examAnswerMapper.insert(answer);
             }
         }
-        
-        // 返回attemptId（使用submitTime的hashCode作为临时ID，实际应该使用数据库生成的ID）
-        // 这里简化处理，返回submitTime的毫秒数作为attemptId
+
         return submitTime.toEpochSecond(java.time.ZoneOffset.UTC) * 1000;
     }
 
@@ -242,11 +235,11 @@ public class ExamServiceImpl implements ExamService {
         List<ExamAnswer> allAnswers = examAnswerMapper.findByExamIdAndUserId(examId, userId);
         
         if (attemptId == null) {
-            // 如果没有指定attemptId，返回最新的答案
+            
             if (allAnswers.isEmpty()) {
                 return new ArrayList<>();
             }
-            // 找到最新的submitTime
+            
             LocalDateTime latestTime = allAnswers.stream()
                 .map(ExamAnswer::getSubmitTime)
                 .max(LocalDateTime::compareTo)
@@ -258,7 +251,15 @@ public class ExamServiceImpl implements ExamService {
             }
             return new ArrayList<>();
         } else {
-            // 根据attemptId（实际上是submitTime的毫秒数）过滤
+            
+            ExamAttempt attempt = examAttemptMapper.findById(attemptId);
+            if (attempt != null) {
+                LocalDateTime targetTime = attempt.getSubmitTime();
+                return allAnswers.stream()
+                    .filter(a -> a.getSubmitTime().equals(targetTime))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
             LocalDateTime targetTime = LocalDateTime.ofEpochSecond(attemptId / 1000, 0, java.time.ZoneOffset.UTC);
             return allAnswers.stream()
                 .filter(a -> a.getSubmitTime().equals(targetTime))
@@ -268,39 +269,33 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     public List<Map<String, Object>> getExamAttempts(Long examId, Long userId) {
-        List<ExamAnswer> allAnswers = examAnswerMapper.findByExamIdAndUserId(examId, userId);
         
-        // 按submitTime分组
-        Map<LocalDateTime, List<ExamAnswer>> groupedByTime = allAnswers.stream()
-            .collect(java.util.stream.Collectors.groupingBy(ExamAnswer::getSubmitTime));
+        List<ExamAttempt> examAttempts = examAttemptMapper.findByExamIdAndUserId(examId, userId);
         
         List<Map<String, Object>> attempts = new ArrayList<>();
-        for (Map.Entry<LocalDateTime, List<ExamAnswer>> entry : groupedByTime.entrySet()) {
-            LocalDateTime submitTime = entry.getKey();
-            List<ExamAnswer> answers = entry.getValue();
+        for (ExamAttempt attempt : examAttempts) {
             
-            // 计算总分
-            int totalScore = answers.stream()
-                .mapToInt(a -> a.getScore() != null ? a.getScore() : 0)
-                .sum();
+            List<ExamAnswer> answers = examAnswerMapper.findByExamIdAndUserId(examId, userId);
             
-            // 判断是否已提交（如果有分数，认为已提交）
-            boolean hasSubmitted = totalScore > 0 || answers.stream().anyMatch(a -> a.getScore() != null);
+            List<ExamAnswer> attemptAnswers = answers.stream()
+                .filter(a -> a.getSubmitTime().equals(attempt.getSubmitTime()))
+                .collect(java.util.stream.Collectors.toList());
             
-            Map<String, Object> attempt = new HashMap<>();
-            attempt.put("id", submitTime.toEpochSecond(java.time.ZoneOffset.UTC) * 1000);
-            attempt.put("submitTime", submitTime);
-            attempt.put("createdAt", submitTime);
-            attempt.put("score", totalScore);
-            attempt.put("hasSubmitted", hasSubmitted);
-            attempt.put("answers", answers.stream().collect(java.util.stream.Collectors.toMap(
+            Map<String, Object> attemptMap = new HashMap<>();
+            attemptMap.put("id", attempt.getId());
+            attemptMap.put("submitTime", attempt.getSubmitTime());
+            attemptMap.put("createdAt", attempt.getSubmitTime());
+            attemptMap.put("score", attempt.getTotalScore());
+            attemptMap.put("maxScore", attempt.getMaxScore());
+            attemptMap.put("percentage", attempt.getPercentage() != null ? attempt.getPercentage().doubleValue() : 0.0);
+            attemptMap.put("hasSubmitted", true); 
+            attemptMap.put("answers", attemptAnswers.stream().collect(java.util.stream.Collectors.toMap(
                 a -> a.getQuestionId().toString(),
                 ExamAnswer::getAnswer
             )));
-            attempts.add(attempt);
+            attempts.add(attemptMap);
         }
-        
-        // 按submitTime降序排序
+
         attempts.sort((a, b) -> {
             LocalDateTime timeA = (LocalDateTime) a.get("submitTime");
             LocalDateTime timeB = (LocalDateTime) b.get("submitTime");
@@ -321,11 +316,10 @@ public class ExamServiceImpl implements ExamService {
         List<Question> questions = getExamQuestions(examId);
         int totalScore = 0;
         int maxScore = 0;
-        
-        // 计算得分（只计算客观题）
+
         for (Question q : questions) {
             if (q.getType().equals("open_question") || q.getType().equals("open question")) {
-                // 主观题不计入自动评分
+                
                 continue;
             }
             maxScore += q.getPoints();
@@ -334,8 +328,7 @@ public class ExamServiceImpl implements ExamService {
                 totalScore += q.getPoints();
             }
         }
-        
-        // 使用统一的submitTime保存所有答案
+
         LocalDateTime submitTime = LocalDateTime.now();
         for (Map.Entry<Long, String> entry : answers.entrySet()) {
             ExamAnswer existing = examAnswerMapper.findByExamIdAndUserIdAndQuestionId(
@@ -347,8 +340,7 @@ public class ExamServiceImpl implements ExamService {
             answer.setQuestionId(entry.getKey());
             answer.setAnswer(entry.getValue());
             answer.setSubmitTime(submitTime);
-            
-            // 计算该题的得分
+
             Question q = questions.stream()
                 .filter(question -> question.getId().equals(entry.getKey()))
                 .findFirst()
@@ -360,7 +352,7 @@ public class ExamServiceImpl implements ExamService {
                     answer.setScore(0);
                 }
             } else {
-                answer.setScore(0); // 主观题暂时为0
+                answer.setScore(0); 
             }
             
             if (existing != null) {
@@ -370,12 +362,26 @@ public class ExamServiceImpl implements ExamService {
                 examAnswerMapper.insert(answer);
             }
         }
+
+        double percentageValue = maxScore > 0 ? (totalScore * 100.0 / maxScore) : 0;
+        BigDecimal percentage = BigDecimal.valueOf(percentageValue).setScale(2, RoundingMode.HALF_UP);
+
+        ExamAttempt attempt = new ExamAttempt();
+        attempt.setExamId(examId);
+        attempt.setUserId(userId);
+        attempt.setTotalScore(totalScore);
+        attempt.setMaxScore(maxScore);
+        attempt.setPercentage(percentage);
+        attempt.setSubmitTime(submitTime);
+        examAttemptMapper.insert(attempt);
+
+        updateSM2Stats(examId, userId, percentageValue, submitTime);
         
         Map<String, Object> result = new HashMap<>();
         result.put("totalScore", totalScore);
         result.put("maxScore", maxScore);
-        result.put("percentage", maxScore > 0 ? (totalScore * 100.0 / maxScore) : 0);
-        result.put("attemptId", submitTime.toEpochSecond(java.time.ZoneOffset.UTC) * 1000);
+        result.put("percentage", percentageValue);
+        result.put("attemptId", attempt.getId());
         
         return result;
     }
@@ -390,8 +396,146 @@ public class ExamServiceImpl implements ExamService {
         if (!exam.getUserId().equals(userId)) {
             throw new RuntimeException("无权删除此考试");
         }
-        // 删除考试（级联删除题目和答案）
+        
         examMapper.deleteById(examId);
+    }
+
+    private int calculateQuality(double percentage) {
+        if (percentage >= 90) return 5;
+        if (percentage >= 70) return 4;
+        if (percentage >= 50) return 3;
+        if (percentage >= 30) return 2;
+        if (percentage > 0) return 1;
+        return 0;
+    }
+
+    private void updateSM2Stats(Long examId, Long userId, double percentage, LocalDateTime submitTime) {
+        ExamSM2Stats stats = examSM2StatsMapper.findByExamIdAndUserId(examId, userId);
+        int quality = calculateQuality(percentage);
+        
+        if (stats == null) {
+            
+            stats = new ExamSM2Stats();
+            stats.setExamId(examId);
+            stats.setUserId(userId);
+            stats.setEaseFactor(BigDecimal.valueOf(2.5));
+            stats.setIntervalDays(1);
+            stats.setLastReviewDate(submitTime);
+            stats.setNextReviewDate(submitTime.plusDays(1));
+            examSM2StatsMapper.insert(stats);
+        }
+
+        BigDecimal ef = stats.getEaseFactor();
+        if (quality >= 3) {
+            double newEF = ef.doubleValue() + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+            ef = BigDecimal.valueOf(Math.max(1.3, newEF));
+        }
+        stats.setEaseFactor(ef);
+
+        int newInterval;
+        if (quality < 3) {
+            newInterval = 1; 
+        } else {
+            int currentInterval = stats.getIntervalDays();
+            if (currentInterval == 1) {
+                newInterval = 6; 
+            } else {
+                newInterval = (int)(currentInterval * ef.doubleValue());
+            }
+        }
+        stats.setIntervalDays(newInterval);
+        stats.setLastReviewDate(submitTime);
+        stats.setNextReviewDate(submitTime.plusDays(newInterval));
+        
+        examSM2StatsMapper.update(stats);
+    }
+
+    @Override
+    public List<Map<String, Object>> getReviewExams(Long userId, int limit) {
+        LocalDateTime now = LocalDateTime.now();
+        List<ExamSM2Stats> sm2Stats = examSM2StatsMapper.findByUserId(userId);
+        List<Map<String, Object>> reviewExams = new ArrayList<>();
+        
+        for (ExamSM2Stats stat : sm2Stats) {
+            
+            if (stat.getNextReviewDate() != null && 
+                (stat.getNextReviewDate().isBefore(now) || stat.getNextReviewDate().isEqual(now))) {
+                
+                Exam exam = examMapper.findById(stat.getExamId());
+                if (exam == null) continue;
+
+                long overdueDays = java.time.temporal.ChronoUnit.DAYS.between(stat.getNextReviewDate(), now);
+                double priority = 1.0 + Math.min(overdueDays / 10.0, 1.0); 
+
+                List<ExamAttempt> attempts = examAttemptMapper.findByExamIdAndUserId(stat.getExamId(), userId);
+                Object lastSubmitTime = null;
+                Object lastPercentage = null;
+                if (!attempts.isEmpty()) {
+                    ExamAttempt lastAttempt = attempts.get(0); 
+                    lastSubmitTime = lastAttempt.getSubmitTime();
+                    lastPercentage = lastAttempt.getPercentage() != null ? 
+                        lastAttempt.getPercentage().doubleValue() : null;
+                }
+                
+                Map<String, Object> reviewExam = new HashMap<>();
+                reviewExam.put("exam", exam);
+                reviewExam.put("priority", priority);
+                reviewExam.put("lastSubmitTime", lastSubmitTime);
+                reviewExam.put("lastPercentage", lastPercentage);
+                reviewExam.put("attemptCount", attempts.size());
+                reviewExam.put("nextReviewDate", stat.getNextReviewDate());
+                reviewExams.add(reviewExam);
+            }
+        }
+
+        if (reviewExams.isEmpty()) {
+            return getReviewExamsFallback(userId, limit);
+        }
+
+        reviewExams.sort((a, b) -> Double.compare((Double) b.get("priority"), (Double) a.get("priority")));
+        return reviewExams.stream().limit(limit).collect(java.util.stream.Collectors.toList());
+    }
+
+    private List<Map<String, Object>> getReviewExamsFallback(Long userId, int limit) {
+        List<Map<String, Object>> statistics = examAttemptMapper.getReviewStatisticsByUserId(userId);
+        if (statistics == null || statistics.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        List<Map<String, Object>> reviewExams = new ArrayList<>();
+        
+        for (Map<String, Object> stat : statistics) {
+            Object examIdObj = stat.get("exam_id");
+            if (examIdObj == null || !(examIdObj instanceof Number)) continue;
+            
+            Long examId = ((Number) examIdObj).longValue();
+            Object lastSubmitTimeObj = stat.get("last_submit_time");
+            
+            if (lastSubmitTimeObj != null) {
+                LocalDateTime lastSubmitTime = (LocalDateTime) lastSubmitTimeObj;
+                if (lastSubmitTime.isAfter(todayStart) || lastSubmitTime.isEqual(todayStart)) {
+                    continue;
+                }
+            }
+            
+            Exam exam = examMapper.findById(examId);
+            if (exam == null) continue;
+            
+            double priority = lastSubmitTimeObj == null ? 1.0 : 0.5;
+            
+            Map<String, Object> reviewExam = new HashMap<>();
+            reviewExam.put("exam", exam);
+            reviewExam.put("priority", priority);
+            reviewExam.put("lastSubmitTime", lastSubmitTimeObj);
+            reviewExam.put("lastPercentage", stat.get("last_percentage"));
+            reviewExam.put("attemptCount", stat.getOrDefault("attempt_count", 0));
+            reviewExams.add(reviewExam);
+        }
+        
+        reviewExams.sort((a, b) -> Double.compare((Double) b.get("priority"), (Double) a.get("priority")));
+        return reviewExams.stream().limit(limit).collect(java.util.stream.Collectors.toList());
     }
 
 }

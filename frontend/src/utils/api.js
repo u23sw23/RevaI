@@ -1,19 +1,19 @@
 const API_BASE = '/api'
 
-// 格式化日期为前端需要的格式
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return date.toISOString().split('T')[0]
 }
 
-// 将后端数据转换为前端格式
 export const transformSubject = (subject) => {
   return {
     id: subject.id,
     name: subject.name,
     description: subject.description || '',
     visibility: subject.visibility || 'private',
+    userId: subject.userId || subject.user_id,
+    creatorUsername: subject.creatorUsername || subject.creator_username,
     notes: (subject.notes || []).map(transformNote)
   }
 }
@@ -29,7 +29,7 @@ export const transformNote = (note) => {
 }
 
 export const api = {
-  // 获取所有科目
+  
   getSubjects: async (userId) => {
     const res = await fetch(`${API_BASE}/subjects?userId=${userId}`)
     const data = await res.json()
@@ -39,7 +39,18 @@ export const api = {
     return []
   },
 
-  // 获取科目详情
+  getSubjectsSeparated: async (userId) => {
+    const res = await fetch(`${API_BASE}/subjects?userId=${userId}&separated=true`)
+    const data = await res.json()
+    if (data.success && data.data) {
+      return {
+        personal: (data.data.personal || []).map(transformSubject),
+        group: (data.data.group || []).map(transformSubject)
+      }
+    }
+    return { personal: [], group: [] }
+  },
+
   getSubjectById: async (id) => {
     const res = await fetch(`${API_BASE}/subjects/${id}`)
     const data = await res.json()
@@ -49,7 +60,6 @@ export const api = {
     return null
   },
 
-  // 创建科目
   createSubject: async (subject) => {
     const res = await fetch(`${API_BASE}/subjects`, {
       method: 'POST',
@@ -63,7 +73,6 @@ export const api = {
     throw new Error(data.message || '创建失败')
   },
 
-  // 更新科目
   updateSubject: async (id, subject) => {
     const res = await fetch(`${API_BASE}/subjects/${id}`, {
       method: 'PUT',
@@ -77,7 +86,6 @@ export const api = {
     throw new Error(data.message || '更新失败')
   },
 
-  // 删除科目
   deleteSubject: async (id) => {
     const res = await fetch(`${API_BASE}/subjects/${id}`, {
       method: 'DELETE'
@@ -88,7 +96,18 @@ export const api = {
     }
   },
 
-  // 获取笔记详情
+  cloneSubject: async (subjectId, userId) => {
+    const res = await fetch(`${API_BASE}/subjects/${subjectId}/clone?userId=${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    const data = await res.json()
+    if (data.success && data.data) {
+      return transformSubject(data.data)
+    }
+    throw new Error(data.message || '克隆失败')
+  },
+
   getNoteById: async (id) => {
     const res = await fetch(`${API_BASE}/notes/${id}`)
     const data = await res.json()
@@ -98,7 +117,6 @@ export const api = {
     return null
   },
 
-  // 创建笔记
   createNote: async (note) => {
     const res = await fetch(`${API_BASE}/notes`, {
       method: 'POST',
@@ -112,7 +130,6 @@ export const api = {
     throw new Error(data.message || '创建失败')
   },
 
-  // 更新笔记
   updateNote: async (id, note) => {
     const res = await fetch(`${API_BASE}/notes/${id}`, {
       method: 'PUT',
@@ -126,7 +143,6 @@ export const api = {
     throw new Error(data.message || '更新失败')
   },
 
-  // 删除笔记
   deleteNote: async (id) => {
     const res = await fetch(`${API_BASE}/notes/${id}`, {
       method: 'DELETE'
@@ -137,7 +153,6 @@ export const api = {
     }
   },
 
-  // 上传文件并创建笔记
   uploadAndCreateNote: async (subjectId, noteName, files, userId) => {
     const formData = new FormData()
     formData.append('subjectId', subjectId)
@@ -160,7 +175,6 @@ export const api = {
     throw new Error(data.message || '上传失败')
   },
 
-  // 获取用户个人信息（包含统计数据）
   getUserProfile: async (userId) => {
     const res = await fetch(`${API_BASE}/users/profile?userId=${userId}`)
     const data = await res.json()
@@ -170,7 +184,6 @@ export const api = {
     throw new Error(data.message || '获取用户信息失败')
   },
 
-  // 更新用户个人信息
   updateUserProfile: async (userId, userInfo) => {
     const res = await fetch(`${API_BASE}/users/profile?userId=${userId}`, {
       method: 'PUT',
@@ -184,7 +197,18 @@ export const api = {
     throw new Error(data.message || '更新用户信息失败')
   },
 
-  // 获取所有公开的科目
+  searchPublicSubjects: async (keyword) => {
+    if (!keyword || !keyword.trim()) {
+      return []
+    }
+    const res = await fetch(`${API_BASE}/subjects/search?keyword=${encodeURIComponent(keyword.trim())}`)
+    const data = await res.json()
+    if (data.success && data.data) {
+      return data.data.map(transformSubject)
+    }
+    return []
+  },
+
   getPublicSubjects: async () => {
     try {
       const res = await fetch(`${API_BASE}/subjects?visibility=public`)
@@ -206,7 +230,6 @@ export const api = {
     }
   },
 
-  // 获取用户所属的群组列表
   getUserGroups: async (userId) => {
     const res = await fetch(`${API_BASE}/groups?userId=${userId}`)
     const data = await res.json()
@@ -223,7 +246,38 @@ export const api = {
     return []
   },
 
-  // 上传头像
+  getGroupSharedSubject: async (groupId) => {
+    try {
+      const res = await fetch(`${API_BASE}/groups/${groupId}/subject`)
+      const data = await res.json()
+      if (data.success && data.data) {
+        return transformSubject(data.data)
+      }
+      return null
+    } catch (error) {
+      console.error('Failed to get group shared subject:', error)
+      return null
+    }
+  },
+
+  createGroupSharedSubject: async (groupId, subject) => {
+    try {
+      const res = await fetch(`${API_BASE}/groups/${groupId}/subject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subject)
+      })
+      const data = await res.json()
+      if (data.success && data.data) {
+        return transformSubject(data.data)
+      }
+      throw new Error(data.message || '创建失败')
+    } catch (error) {
+      console.error('Failed to create group shared subject:', error)
+      throw error
+    }
+  },
+
   uploadAvatar: async (userId, file) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -241,7 +295,6 @@ export const api = {
     throw new Error(data.message || '上传头像失败')
   },
 
-  // 获取考试（根据笔记ID）- 兼容旧版本
   getExamByNoteId: async (noteId, userId) => {
     const res = await fetch(`${API_BASE}/exams?noteId=${noteId}&userId=${userId}`)
     const data = await res.json()
@@ -251,7 +304,6 @@ export const api = {
     return null
   },
 
-  // 获取笔记下的所有考试
   getExamsByNoteId: async (noteId, userId) => {
     const res = await fetch(`${API_BASE}/exams?noteId=${noteId}&userId=${userId}&all=true`)
     const data = await res.json()
@@ -261,7 +313,6 @@ export const api = {
     return []
   },
 
-  // 根据考试ID获取考试详情
   getExamById: async (examId) => {
     const res = await fetch(`${API_BASE}/exams/${examId}`)
     const data = await res.json()
@@ -271,7 +322,6 @@ export const api = {
     throw new Error(data.message || '获取考试失败')
   },
 
-  // 生成考试（使用AI）- 支持配置
   generateExam: async (noteId, userId, noteContent, questionCount = 8, difficulty = 'medium', selectedTypes = ['single', 'true-false', 'open'], examName = null) => {
     const res = await fetch(`${API_BASE}/exams/generate`, {
       method: 'POST',
@@ -296,7 +346,6 @@ export const api = {
     throw new Error(data.message || '生成考试失败')
   },
 
-  // 删除考试
   deleteExam: async (examId, userId) => {
     const res = await fetch(`${API_BASE}/exams/${examId}?userId=${userId}`, {
       method: 'DELETE'
@@ -307,7 +356,6 @@ export const api = {
     }
   },
 
-  // 获取考试的所有作答记录
   getExamAttempts: async (examId, userId) => {
     const res = await fetch(`${API_BASE}/exams/${examId}/attempts?userId=${userId}`)
     const data = await res.json()
@@ -317,12 +365,11 @@ export const api = {
     return []
   },
 
-  // 获取作答记录的答案
   getExamAnswers: async (examId, userId, attemptId) => {
     const res = await fetch(`${API_BASE}/exams/${examId}/answers?userId=${userId}&attemptId=${attemptId || ''}`)
     const data = await res.json()
     if (data.success && data.data) {
-      // 转换格式：{ questionId: answer }
+      
       const answers = {}
       if (Array.isArray(data.data)) {
         data.data.forEach(item => {
@@ -334,7 +381,6 @@ export const api = {
     return {}
   },
 
-  // 保存用户答案
   saveExamAnswers: async (examId, userId, answers, attemptId = null) => {
     const res = await fetch(`${API_BASE}/exams/${examId}/answers?userId=${userId}${attemptId ? `&attemptId=${attemptId}` : ''}`, {
       method: 'POST',
@@ -345,11 +391,10 @@ export const api = {
     if (!data.success) {
       throw new Error(data.message || '保存答案失败')
     }
-    // 返回attemptId（如果有）
+    
     return data.attemptId || null
   },
 
-  // 提交考试
   submitExam: async (examId, userId, answers, attemptId = null) => {
     const res = await fetch(`${API_BASE}/exams/${examId}/submit?userId=${userId}${attemptId ? `&attemptId=${attemptId}` : ''}`, {
       method: 'POST',
@@ -366,10 +411,19 @@ export const api = {
       }
     }
     throw new Error(data.message || '提交考试失败')
+  },
+
+  getReviewExams: async (userId, limit = 5) => {
+    const res = await fetch(`${API_BASE}/exams/review?userId=${userId}&limit=${limit}`)
+    const data = await res.json()
+    if (!data.success) {
+      console.error('获取复习试题失败:', data.message, data.error)
+      throw new Error(data.message || '获取复习试题失败')
+    }
+    return data.data || []
   }
 }
 
-// 根据笔记ID查找笔记和所属科目
 export const findNoteById = async (noteId) => {
   try {
     const note = await api.getNoteById(noteId)
@@ -377,9 +431,6 @@ export const findNoteById = async (noteId) => {
       return { subject: null, note: null }
     }
 
-    // 需要先获取所有科目来找到笔记所属的科目
-    // 这里简化处理，实际应该在后端提供根据noteId查找subject的接口
-    // 暂时返回note，subject需要从父组件传入或通过其他方式获取
     return { subject: null, note }
   } catch (error) {
     console.error('Error finding note:', error)

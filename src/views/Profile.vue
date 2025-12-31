@@ -84,7 +84,6 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-// 从 Layout 传入的当前用户信息（来源于登录/注册成功或本地存储）
 const props = defineProps({
   user: {
     type: Object,
@@ -92,7 +91,6 @@ const props = defineProps({
   }
 })
 
-// 当前页面编辑态下的用户信息
 const userInfo = ref({
   name: '',
   email: '',
@@ -107,7 +105,6 @@ const userInfo = ref({
 
 const originalInfo = JSON.parse(JSON.stringify(userInfo.value))
 
-// 根据 props.user 或本地存储初始化 userInfo
 const initUserInfo = () => {
   let source = props.user
   if (!source) {
@@ -141,7 +138,6 @@ onMounted(() => {
   initUserInfo()
 })
 
-// 当父组件传入的 user 变化时，同步更新
 watch(
   () => props.user,
   () => {
@@ -151,10 +147,10 @@ watch(
 )
 
 const saveProfile = () => {
-  // TODO: 保存个人信息到后端
+  
   alert('保存成功！')
   Object.assign(originalInfo, userInfo.value)
-  // 同步更新本地存储的用户信息，便于 TopHeader / Layout 读取
+  
   localStorage.setItem('auth_user', JSON.stringify(userInfo.value))
 }
 
@@ -162,12 +158,11 @@ const resetProfile = () => {
   userInfo.value = JSON.parse(JSON.stringify(originalInfo))
 }
 
-// 退出登录：清除本地登录状态并回到游客视图
 const logout = () => {
-  // 清除 TopHeader 使用的本地登录标记（如有 token 也可一并清除）
+  
   localStorage.removeItem('auth_username')
   localStorage.removeItem('auth_user')
-  // 根据需要可清空本地用户信息
+  
   userInfo.value = {
     name: '',
     email: '',
@@ -179,7 +174,7 @@ const logout = () => {
     examCount: 0,
     groupCount: 0
   }
-  // 跳转回首页（或任意页面），并刷新一次让 TopHeader 重新以游客状态渲染
+  
   router.push('/repositories').then(() => {
     window.location.reload()
   })

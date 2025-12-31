@@ -3,20 +3,15 @@ package com.example.demo.entity;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 群组实体类
- */
 public class Group {
     private Long id;
     private String name;
-    private Long creatorId; // 创建者ID
+    private Long creatorId; 
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
-    
-    // 成员列表（不存储在数据库中，通过关联表查询）
+
     private List<Long> memberIds;
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

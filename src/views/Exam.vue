@@ -1,6 +1,6 @@
 <template>
   <div class="exam-page">
-    <!-- Exam list (similar to repositories cards) -->
+    
     <div v-if="!selectedNote" class="paper-list">
       <h2 class="page-title">Select exam / note</h2>
       <p class="page-subtitle">Choose a note to view or generate exams.</p>
@@ -22,7 +22,6 @@
       </div>
     </div>
 
-    <!-- Exam detail -->
     <div v-else class="exam-detail">
       <div class="exam-header">
         <div class="exam-info-left">
@@ -100,8 +99,7 @@
           </div>
         </div>
       </div>
-      
-      <!-- 生成配置（简单表单，尽量不影响原有布局） -->
+
       <div v-if="showGenerateConfig" class="question-section">
         <div class="question-box">
           <div class="question-header">
@@ -216,7 +214,6 @@
             </li>
           </ul>
 
-          <!-- 提交后显示正确答案与解析 -->
           <div v-if="hasSubmitted" class="explanation-box">
             <div class="explanation-answer">
               Correct answer:
@@ -262,32 +259,8 @@
 import { computed, ref, onMounted } from 'vue'
 import { subjects as seedSubjects } from '../data/notes'
 
-// 从 localStorage 或默认数据构建科目和笔记
 const SUBJECTS_STORAGE_KEY = 'revai-subjects'
-// 试卷与作答缓存（v2 结构，兼容旧数据）
-// 结构示例：
-// {
-//   [noteId]: {
-//     exams: {
-//       [examId]: {
-//         id,
-//         name,
-//         createdAt,
-//         config: { questionCount, difficulty, selectedTypes },
-//         questions: Question[],
-//         attempts: [
-//           {
-//             id,
-//             createdAt,
-//             score,
-//             answers,
-//             hasSubmitted
-//           }
-//         ]
-//       }
-//     }
-//   }
-// }
+
 const EXAMS_STORAGE_KEY = 'revai-exams-v2'
 const subjects = ref([])
 
@@ -307,7 +280,6 @@ const loadSubjects = () => {
   subjects.value = seedSubjects.map(s => ({ ...s }))
 }
 
-// 从本地读取某个笔记下的所有试卷（兼容旧结构）
 const loadNoteExamsFromStorage = (noteId) => {
   try {
     const stored = localStorage.getItem(EXAMS_STORAGE_KEY)
@@ -316,7 +288,7 @@ const loadNoteExamsFromStorage = (noteId) => {
     if (!parsed || typeof parsed !== 'object') return { exams: {} }
     const noteData = parsed[noteId]
     if (!noteData) return { exams: {} }
-    // 兼容旧数据：如果直接存的是 { questions, answers, ... }，则包装成默认考试 default
+    
     if (!noteData.exams) {
       if (Array.isArray(noteData.questions) && noteData.questions.length) {
         return {
@@ -353,7 +325,6 @@ const loadNoteExamsFromStorage = (noteId) => {
   return { exams: {} }
 }
 
-// 保存某个笔记下的所有试卷
 const saveNoteExamsToStorage = (noteId, examsObject) => {
   try {
     const stored = localStorage.getItem(EXAMS_STORAGE_KEY)
@@ -372,48 +343,43 @@ onMounted(() => {
   loadSubjects()
 })
 
-// Build exam list dynamically from note data
 const papers = computed(() =>
   subjects.value.flatMap(subject =>
     (subject.notes || []).map(note => ({
       id: note.id,
       title: note.title,
       desc: subject.name,
-      total: 8, // default number of questions per exam
+      total: 8, 
       updatedAt: note.updatedAt,
       content: note.content,
     }))
   )
 )
 
-// 当前选中的笔记（paper 就是一个 note）
 const selectedNote = ref(null)
-// 当前笔记下的所有试卷
-const currentNoteExams = ref({}) // { [examId]: examMeta }
 
-// 当前正在答的“试卷 + 作答”
-const selectedExam = ref(null) // { id, name, questions, config, ... }
-const selectedExamId = ref(null) // 供下拉框使用
+const currentNoteExams = ref({}) 
+
+const selectedExam = ref(null) 
+const selectedExamId = ref(null) 
 const currentAttemptId = ref(null)
 const currentIndex = ref(0)
 const score = ref(0)
 const userAnswer = ref(null)
 const subjectiveAnswer = ref('')
-const answers = ref({}) // 记录每题作答
+const answers = ref({}) 
 const hasSubmitted = ref(false)
 
-// Questions generated from selected note content
 const questions = ref([])
 
 const totalQuestions = computed(() => questions.value.length)
 const currentQuestion = computed(() => questions.value[currentIndex.value] || {})
 
-// 当前试卷下的所有作答记录
 const currentExamAttempts = computed(() => {
   if (!selectedExam.value || !Array.isArray(selectedExam.value.attempts)) {
     return []
   }
-  // 最近的在前
+  
   return [...selectedExam.value.attempts].sort((a, b) => {
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
   })
@@ -429,7 +395,6 @@ const formatAttemptLabel = (attempt, index) => {
   return `Attempt ${idx} - ${scoreText}${date ? ' (' + date + ')' : ''}`
 }
 
-// 当前试卷的客观题总分（只统计 single / true-false）
 const maxObjectiveScore = computed(() => {
   if (!questions.value || !questions.value.length) return 0
   return questions.value.reduce((sum, q) => {
@@ -439,14 +404,12 @@ const maxObjectiveScore = computed(() => {
   }, 0)
 })
 
-// 判断选项是否为正确答案（支持大小写和 True/False 匹配）
 const isCorrectOption = (optionValue) => {
   const correct = String(currentQuestion.value.correctAnswer || '').trim().toLowerCase()
   const val = String(optionValue || '').trim().toLowerCase()
   return correct === val
 }
 
-// 格式化题目类型显示
 const formatQuestionType = (type) => {
   const typeMap = {
     'single choice': 'Single Choice',
@@ -456,21 +419,18 @@ const formatQuestionType = (type) => {
   return typeMap[type] || type
 }
 
-// AI 生成试卷状态 & 配置
 const isGeneratingExam = ref(false)
 const generatingExamStatus = ref('')
 
-// 生成配置（题型、题数、难度）
 const showGenerateConfig = ref(false)
 const generateConfig = ref({
   name: '测试1',
   questionCount: 8,
   difficulty: 'medium',
-  // 前端希望生成的题型，传给后端做提示
+  
   selectedTypes: ['single', 'true-false', 'open'],
 })
 
-// 方便根据当前 exams 自动生成下一个测试名称
 const getNextExamName = () => {
   if (!selectedNote.value) return '测试1'
   const exams = currentNoteExams.value || {}
@@ -484,7 +444,7 @@ const getNextExamName = () => {
 }
 
 const selectPaper = async (paper) => {
-  // 选择笔记
+  
   selectedNote.value = paper
   selectedExam.value = null
   currentNoteExams.value = loadNoteExamsFromStorage(paper.id).exams || {}
@@ -494,7 +454,6 @@ const selectPaper = async (paper) => {
   score.value = 0
   hasSubmitted.value = false
 
-  // 如果已有试卷，默认选中最新的一份及其最近一次作答
   const exams = currentNoteExams.value
   const examList = Object.values(exams).sort((a, b) => {
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
@@ -503,7 +462,7 @@ const selectPaper = async (paper) => {
   if (examList.length) {
     loadExamSession(examList[0].id, { useLatestAttempt: true })
   } else {
-    // 没有试卷时，弹出生成配置
+    
     generateConfig.value = {
       name: getNextExamName(),
       questionCount: paper.total || 8,
@@ -556,7 +515,6 @@ const prevQuestion = () => {
   }
 }
 
-// 同步主观题答案
 const updateSubjectiveAnswer = () => {
   if (currentQuestion.value.type === 'open question' && currentQuestion.value.id) {
     answers.value[currentQuestion.value.id] = subjectiveAnswer.value
@@ -570,7 +528,6 @@ const submitExam = () => {
     return
   }
 
-  // 计算客观题得分：单选 / 判断
   let total = 0
   questions.value.forEach((q) => {
     const ans = answers.value[q.id]
@@ -591,8 +548,6 @@ const submitExam = () => {
   alert(`Exam submitted! Your objective score: ${score.value} pts`)
 }
 
-// Very simple local generator that creates questions based on note content.
-// Used as a fallback when AI generation fails.
 const generateQuestionsFromContent = (content) => {
   if (!content) {
     questions.value = []
@@ -622,7 +577,6 @@ const generateQuestionsFromContent = (content) => {
   ]
 }
 
-// 根据当前 selectedExam + currentAttemptId，将答案等写回 localStorage
 const persistCurrentAttempt = (submitted = false, finalScore = null) => {
   if (!selectedNote.value || !selectedExam.value || !currentAttemptId.value) return
   const noteId = selectedNote.value.id
@@ -656,7 +610,6 @@ const persistCurrentAttempt = (submitted = false, finalScore = null) => {
   saveNoteExamsToStorage(noteId, exams)
 }
 
-// 选择某一套试卷 + 某次作答（或新作答）
 const loadExamSession = (examId, { attemptId = null, useLatestAttempt = false } = {}) => {
   const exams = currentNoteExams.value || {}
   const exam = exams[examId]
@@ -679,7 +632,7 @@ const loadExamSession = (examId, { attemptId = null, useLatestAttempt = false } 
   }
 
   if (!targetAttempt) {
-    // 新作答
+    
     const newAttemptId = `attempt-${Date.now()}`
     currentAttemptId.value = newAttemptId
     answers.value = {}
@@ -694,7 +647,6 @@ const loadExamSession = (examId, { attemptId = null, useLatestAttempt = false } 
     score.value = targetAttempt.score || 0
     hasSubmitted.value = !!targetAttempt.hasSubmitted
 
-    // 恢复第一题的作答状态
     const firstQ = questions.value[0]
     if (firstQ && firstQ.id && targetAttempt.answers[firstQ.id]) {
       if (firstQ.type === 'open question') {
@@ -711,7 +663,6 @@ const loadExamSession = (examId, { attemptId = null, useLatestAttempt = false } 
   }
 }
 
-// 创建一套新试卷（根据当前配置）
 const createNewExamWithAI = async () => {
   if (!selectedNote.value) return
   const paper = selectedNote.value
@@ -719,7 +670,6 @@ const createNewExamWithAI = async () => {
 
   showGenerateConfig.value = false
 
-  // 初始化状态
   userAnswer.value = null
   subjectiveAnswer.value = ''
   answers.value = {}
@@ -736,19 +686,16 @@ const createNewExamWithAI = async () => {
   }
 }
 
-// 供下拉框切换试卷时使用
 const onChangeExam = () => {
   if (!selectedExamId.value) return
   loadExamSession(selectedExamId.value, { useLatestAttempt: true })
 }
 
-// 在同一套试卷内切换不同作答记录
 const onChangeAttempt = () => {
   if (!selectedExam.value || !currentAttemptId.value) return
   loadExamSession(selectedExam.value.id, { attemptId: currentAttemptId.value })
 }
 
-// 手动打开生成配置（比如点击“New test”按钮）
 const showNewExamConfig = () => {
   if (!selectedNote.value) return
   generateConfig.value = {
@@ -760,7 +707,6 @@ const showNewExamConfig = () => {
   showGenerateConfig.value = true
 }
 
-// 删除一整套试卷
 const deleteExam = (examId) => {
   if (!selectedNote.value) return
   const exams = { ...(currentNoteExams.value || {}) }
@@ -771,7 +717,6 @@ const deleteExam = (examId) => {
   currentNoteExams.value = exams
   saveNoteExamsToStorage(selectedNote.value.id, exams)
 
-  // 如果删掉的是当前正在看的试卷，则切换到最新一份或清空
   if (selectedExam.value?.id === examId) {
     const examList = Object.values(exams).sort((a, b) => {
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
@@ -789,13 +734,11 @@ const deleteExam = (examId) => {
   }
 }
 
-// 为当前试卷再做一次（保留历史作答）
 const redoCurrentExam = () => {
   if (!selectedExam.value) return
   loadExamSession(selectedExam.value.id, { attemptId: null, useLatestAttempt: false })
 }
 
-// 使用后端 AI 生成试卷
 const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 'medium', selectedTypes = ['single', 'true-false', 'open'] } = {}) => {
   if (!paper?.content) {
     return false
@@ -826,7 +769,7 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
         const err = JSON.parse(text)
         msg = err.error || JSON.stringify(err)
       } catch {
-        // ignore
+        
       }
       alert('Failed to generate exam: ' + msg)
       return false
@@ -848,7 +791,7 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
     }
 
     const mapped = apiQuestions.map((q, idx) => {
-      // 确定题目类型
+      
       let questionType = 'single choice'
       if (q.type === 'open') {
         questionType = 'open question'
@@ -856,10 +799,9 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
         questionType = 'true-false'
       }
 
-      // 处理选项
       let options = null
       if (questionType === 'true-false') {
-        // 判断题强制生成 True/False 选项
+        
         options = [
           { value: 'True', label: 'A', text: 'True' },
           { value: 'False', label: 'B', text: 'False' },
@@ -885,7 +827,6 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
 
     questions.value = mapped
 
-    // 创建一套新的试卷元数据
     if (paper?.id) {
       const exams = { ...(currentNoteExams.value || {}) }
       const examId = `exam-${Date.now()}`
@@ -906,7 +847,6 @@ const generateQuestionsWithAI = async (paper, { questionCount = 8, difficulty = 
       currentNoteExams.value = exams
       saveNoteExamsToStorage(paper.id, exams)
 
-      // 立刻进入这套试卷的首次作答
       loadExamSession(examId, { attemptId: null })
     }
 

@@ -6,7 +6,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.2.0</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <relativePath/> 
     </parent>
     <groupId>com.example</groupId>
     <artifactId>Reval</artifactId>
@@ -56,7 +56,7 @@
             <version>4.0.0</version>
             <scope>test</scope>
         </dependency>
-        <!-- PDF parsing -->
+        
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
@@ -67,7 +67,7 @@
             <artifactId>pdfbox-io</artifactId>
             <version>3.0.0</version>
         </dependency>
-        <!-- 支持 .env 文件 -->
+        
         <dependency>
             <groupId>io.github.cdimascio</groupId>
             <artifactId>dotenv-java</artifactId>

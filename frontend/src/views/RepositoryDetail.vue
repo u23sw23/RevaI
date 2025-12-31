@@ -26,7 +26,6 @@ import { useRouter } from 'vue-router'
 import { marked } from 'marked'
 import { api } from '../utils/api'
 
-// 配置 marked
 marked.setOptions({
   breaks: true,
   gfm: true,
@@ -47,7 +46,6 @@ const loading = ref(false)
 
 const repositoryName = computed(() => note.value?.title || props.id)
 
-// 渲染 Markdown 内容
 const renderedContent = computed(() => {
   if (!note.value?.content) return ''
   try {
@@ -57,14 +55,13 @@ const renderedContent = computed(() => {
   }
 })
 
-// 加载笔记详情
 const loadNote = async () => {
   loading.value = true
   try {
     const noteData = await api.getNoteById(props.id)
     if (noteData) {
       note.value = noteData
-      // 如果有subjectId，加载科目信息
+      
       if (noteData.subjectId) {
         try {
           const subjectData = await api.getSubjectById(noteData.subjectId)
@@ -146,7 +143,6 @@ const backToList = () => {
   border: 1px solid #e8e8e8;
 }
 
-/* Markdown 渲染样式 */
 .markdown-body :deep(h1) {
   font-size: 1.8em;
   font-weight: 700;

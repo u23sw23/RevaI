@@ -1,15 +1,16 @@
 package com.example.demo.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public class ExamAnswer {
+public class ExamAttempt {
     private Long id;
     private Long examId;
     private Long userId;
-    private Long questionId;
-    private String answer; 
-    private Integer score; 
-    private LocalDateTime submitTime;
+    private Integer totalScore; 
+    private Integer maxScore; 
+    private BigDecimal percentage; 
+    private LocalDateTime submitTime; 
 
     public Long getId() {
         return id;
@@ -35,28 +36,28 @@ public class ExamAnswer {
         this.userId = userId;
     }
 
-    public Long getQuestionId() {
-        return questionId;
+    public Integer getTotalScore() {
+        return totalScore;
     }
 
-    public void setQuestionId(Long questionId) {
-        this.questionId = questionId;
+    public void setTotalScore(Integer totalScore) {
+        this.totalScore = totalScore;
     }
 
-    public String getAnswer() {
-        return answer;
+    public Integer getMaxScore() {
+        return maxScore;
     }
 
-    public void setAnswer(String answer) {
-        this.answer = answer;
+    public void setMaxScore(Integer maxScore) {
+        this.maxScore = maxScore;
     }
 
-    public Integer getScore() {
-        return score;
+    public BigDecimal getPercentage() {
+        return percentage;
     }
 
-    public void setScore(Integer score) {
-        this.score = score;
+    public void setPercentage(BigDecimal percentage) {
+        this.percentage = percentage;
     }
 
     public LocalDateTime getSubmitTime() {

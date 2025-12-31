@@ -11,7 +11,7 @@
         <result property="correctAnswer" column="correct_answer"/>
         <result property="explanation" column="explanation"/>
         <result property="optionsJson" column="options"/>
-        <!-- options字段需要在Service层通过JSON解析处理 -->
+        
     </resultMap>
     
     <select id="findByExamId" resultMap="QuestionResultMap">

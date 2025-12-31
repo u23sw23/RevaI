@@ -13,7 +13,6 @@
       </button>
     </div>
 
-    <!-- 创建群组弹窗 -->
     <div v-if="showCreateModal" class="modal-overlay">
       <div class="modal">
         <div class="modal-header">
@@ -22,7 +21,7 @@
         </div>
 
         <div class="modal-body">
-          <!-- 群组名称 -->
+          
           <div class="form-item">
             <label class="form-label">Group name</label>
             <input
@@ -33,7 +32,6 @@
             />
           </div>
 
-          <!-- 搜索并添加成员 -->
           <div class="form-item">
             <label class="form-label">Add member (search by username)</label>
             <div class="user-search-row">
@@ -53,7 +51,6 @@
               </button>
             </div>
 
-            <!-- 搜索结果列表 -->
             <div v-if="userSearchResults.length" class="user-list">
               <div
                 v-for="user in userSearchResults"
@@ -69,7 +66,6 @@
               </div>
             </div>
 
-            <!-- 已选择成员 -->
             <div v-if="selectedUsers.length" class="selected-users">
               <div
                 v-for="user in selectedUsers"
@@ -100,7 +96,6 @@
       </div>
     </div>
 
-    <!-- 加入群组弹窗 -->
     <div v-if="showJoinModal" class="modal-overlay">
       <div class="modal">
         <div class="modal-header">
@@ -131,7 +126,6 @@
 
           <p class="hint">Search by the group name and click "Join" after finding it.</p>
 
-          <!-- 查询结果 -->
           <div v-if="searchedGroup" class="group-result-card">
             <div>
               <div class="group-name">{{ searchedGroup.name }}</div>
@@ -162,7 +156,6 @@
 <script setup>
 import { ref } from 'vue'
 
-// 创建群组弹窗状态
 const showCreateModal = ref(false)
 const groupName = ref('')
 const userSearchKeyword = ref('')
@@ -171,7 +164,7 @@ const selectedUsers = ref([])
 const isSearching = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
-// 加入群组弹窗状态
+
 const showJoinModal = ref(false)
 const groupNameToJoin = ref('')
 const searchedGroup = ref(null)
@@ -198,7 +191,6 @@ const resetCreateForm = () => {
   isSubmitting.value = false
 }
 
-// 模拟搜索用户（实际应调用后端 /api/users 接口）
 const searchUsers = async () => {
   const keyword = userSearchKeyword.value.trim()
   if (!keyword) {
@@ -210,7 +202,7 @@ const searchUsers = async () => {
   isSearching.value = true
 
   try {
-    // 示例：实际项目中请与后端约定好 /api/users?q=keyword
+    
     const res = await fetch(`/api/users?q=${encodeURIComponent(keyword)}`, {
       method: 'GET'
     })
@@ -220,7 +212,7 @@ const searchUsers = async () => {
     }
 
     const data = await res.json()
-    // 假设返回 { list: [{ id, name }, ...] }
+    
     userSearchResults.value = data.list || []
   } catch (error) {
     console.error('Error in searching user：', error)
@@ -247,7 +239,6 @@ const removeUser = (userId) => {
   selectedUsers.value = selectedUsers.value.filter((u) => u.id !== userId)
 }
 
-// 提交创建群组
 const submitCreateGroup = async () => {
   if (!groupName.value.trim()) {
     errorMessage.value = 'Please enter group name'
@@ -267,7 +258,6 @@ const submitCreateGroup = async () => {
       memberIds: selectedUsers.value.map((u) => u.id)
     }
 
-    // 创建群组向后端发送请求
     const res = await fetch('/api/groups', {
       method: 'POST',
       headers: {
@@ -280,9 +270,8 @@ const submitCreateGroup = async () => {
       throw new Error('Failed to create the group')
     }
 
-    // 成功后可根据需要刷新群组列表，这里先简单关闭弹窗
     closeCreateGroup()
-    // TODO: 刷新页面上的 groups 列表
+    
   } catch (error) {
     console.error('Error occurred while creating the group.：', error)
     errorMessage.value = 'Failed to create the group. Please try again later.'
@@ -291,7 +280,6 @@ const submitCreateGroup = async () => {
   }
 }
 
-// 打开/关闭加入群组弹窗
 const openJoinGroup = () => {
   resetJoinForm()
   showJoinModal.value = true
@@ -309,7 +297,6 @@ const resetJoinForm = () => {
   isJoining.value = false
 }
 
-// 根据群组名称查询
 const searchGroupByName = async () => {
   const name = groupNameToJoin.value.trim()
   if (!name) {
@@ -322,7 +309,7 @@ const searchGroupByName = async () => {
   isSearchingGroup.value = true
 
   try {
-    // 示例：约定 GET /api/groups?name=xxx 返回 { group: { id, name, ... } }
+    
     const res = await fetch(`/api/groups?name=${encodeURIComponent(name)}`, {
       method: 'GET'
     })
@@ -344,7 +331,6 @@ const searchGroupByName = async () => {
   }
 }
 
-// 加入群组
 const joinGroup = async () => {
   if (!searchedGroup.value?.id) {
     joinError.value = 'Please first search for the target group.'
@@ -355,7 +341,7 @@ const joinGroup = async () => {
   isJoining.value = true
 
   try {
-    // 示例：约定 POST /api/groups/join，body: { groupId, groupName }
+    
     const payload = {
       groupId: searchedGroup.value.id,
       groupName: groupNameToJoin.value.trim()
@@ -373,9 +359,8 @@ const joinGroup = async () => {
       throw new Error('Fail to join the group')
     }
 
-    // 成功后关闭弹窗，后续可刷新群组列表
     closeJoinGroup()
-    // TODO: 刷新页面上的 groups 列表
+    
   } catch (error) {
     console.error('Error in joining the group：', error)
     joinError.value = 'Fail to add the group. Please try it later.'
@@ -443,7 +428,6 @@ const joinGroup = async () => {
   color: white;
 }
 
-/* 弹窗样式 */
 .modal-overlay {
   position: fixed;
   inset: 0;

@@ -1,10 +1,5 @@
--- 注意：数据库需要手动创建，或者确保数据库已存在
--- CREATE DATABASE IF NOT EXISTS demo2 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
--- USE demo2;
 
--- Spring Boot 会自动使用 application.properties 中配置的数据库
 
--- 用户表
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -17,7 +12,6 @@ CREATE TABLE IF NOT EXISTS users (
     INDEX idx_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 科目表
 CREATE TABLE IF NOT EXISTS subjects (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -31,7 +25,6 @@ CREATE TABLE IF NOT EXISTS subjects (
     INDEX idx_visibility (visibility)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 笔记表
 CREATE TABLE IF NOT EXISTS notes (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
@@ -46,7 +39,6 @@ CREATE TABLE IF NOT EXISTS notes (
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 群组表（使用反引号转义，因为 groups 是 MySQL 保留字）
 CREATE TABLE IF NOT EXISTS `groups` (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
@@ -57,7 +49,6 @@ CREATE TABLE IF NOT EXISTS `groups` (
     INDEX idx_creator_id (creator_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 群组成员表
 CREATE TABLE IF NOT EXISTS group_members (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     group_id BIGINT NOT NULL,
@@ -70,7 +61,6 @@ CREATE TABLE IF NOT EXISTS group_members (
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 考试表
 CREATE TABLE IF NOT EXISTS exams (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
@@ -85,7 +75,6 @@ CREATE TABLE IF NOT EXISTS exams (
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 题目表
 CREATE TABLE IF NOT EXISTS questions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     exam_id BIGINT NOT NULL,
@@ -93,13 +82,12 @@ CREATE TABLE IF NOT EXISTS questions (
     type VARCHAR(50) NOT NULL,
     points INT DEFAULT 0,
     correct_answer TEXT,
-    options TEXT, -- JSON格式存储选项：[{"value":"A","label":"A","text":"选项内容"},...]
-    explanation TEXT, -- 题目解析
+    options TEXT,
+    explanation TEXT,
     FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE,
     INDEX idx_exam_id (exam_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 考试答案表
 CREATE TABLE IF NOT EXISTS exam_answers (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     exam_id BIGINT NOT NULL,
@@ -113,5 +101,35 @@ CREATE TABLE IF NOT EXISTS exam_answers (
     FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
     INDEX idx_exam_id (exam_id),
     INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS exam_attempts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    exam_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    total_score INT DEFAULT 0,
+    max_score INT DEFAULT 0,
+    percentage DECIMAL(5, 2) DEFAULT 0.00,
+    submit_time DATETIME NOT NULL,
+    FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_exam_id (exam_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_submit_time (submit_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS exam_sm2_stats (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    exam_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    ease_factor DECIMAL(3, 2) DEFAULT 2.50,
+    interval_days INT DEFAULT 1,
+    last_review_date DATETIME,
+    next_review_date DATETIME,
+    FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_exam_user (exam_id, user_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_next_review_date (next_review_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

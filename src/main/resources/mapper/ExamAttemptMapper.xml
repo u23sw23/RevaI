@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.mapper.ExamAttemptMapper">
+    
+    <resultMap id="ExamAttemptResultMap" type="com.example.demo.entity.ExamAttempt">
+        <id property="id" column="id"/>
+        <result property="examId" column="exam_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="totalScore" column="total_score"/>
+        <result property="maxScore" column="max_score"/>
+        <result property="percentage" column="percentage"/>
+        <result property="submitTime" column="submit_time"/>
+    </resultMap>
+    
+    <select id="findByExamIdAndUserId" resultMap="ExamAttemptResultMap">
+        SELECT * FROM exam_attempts 
+        WHERE exam_id = #{examId} AND user_id = #{userId}
+        ORDER BY submit_time DESC
+    </select>
+    
+    <select id="findById" resultMap="ExamAttemptResultMap">
+        SELECT * FROM exam_attempts WHERE id = #{id}
+    </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO exam_attempts (exam_id, user_id, total_score, max_score, percentage, submit_time)
+        VALUES (#{examId}, #{userId}, #{totalScore}, #{maxScore}, #{percentage}, #{submitTime})
+    </insert>
+    
+    <update id="update">
+        UPDATE exam_attempts
+        SET total_score = #{totalScore},
+            max_score = #{maxScore},
+            percentage = #{percentage},
+            submit_time = #{submitTime}
+        WHERE id = #{id}
+    </update>
+    
+    <delete id="deleteByExamIdAndUserId">
+        DELETE FROM exam_attempts WHERE exam_id = #{examId} AND user_id = #{userId}
+    </delete>
+
+    <select id="getReviewStatisticsByUserId" resultType="java.util.HashMap">
+        SELECT 
+            e.id AS exam_id,
+            e.title AS exam_title,
+            e.note_id,
+            MAX(ea.submit_time) AS last_submit_time,
+            (SELECT percentage FROM exam_attempts 
+             WHERE exam_id = e.id AND user_id = #{userId} 
+             ORDER BY submit_time DESC LIMIT 1) AS last_percentage,
+            IFNULL(COUNT(ea.id), 0) AS attempt_count
+        FROM exams e
+        LEFT JOIN exam_attempts ea ON e.id = ea.exam_id AND ea.user_id = #{userId}
+        WHERE e.user_id = #{userId}
+        GROUP BY e.id, e.title, e.note_id
+    </select>
+</mapper>
+

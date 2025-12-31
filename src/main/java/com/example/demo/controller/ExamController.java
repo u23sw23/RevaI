@@ -21,11 +21,6 @@ public class ExamController {
     @Autowired
     private com.example.demo.controller.AiController aiController;
 
-    /**
-     * 根据笔记ID获取考试
-     * GET /api/exams?noteId=xxx&userId=xxx&all=true (获取所有考试)
-     * GET /api/exams?noteId=xxx&userId=xxx (获取第一个考试，兼容旧版本)
-     */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getExamByNoteId(
             @RequestParam Long noteId,
@@ -34,13 +29,13 @@ public class ExamController {
         Map<String, Object> response = new HashMap<>();
         try {
             if (Boolean.TRUE.equals(all)) {
-                // 获取该笔记下的所有考试
+                
                 List<Exam> exams = examService.getExamsByNoteId(noteId);
                 response.put("success", true);
                 response.put("data", exams);
                 return ResponseEntity.ok(response);
             } else {
-                // 兼容旧版本：返回第一个考试
+                
                 Exam exam = examService.getExamByNoteId(noteId);
                 if (exam == null) {
                     response.put("success", false);
@@ -58,10 +53,6 @@ public class ExamController {
         }
     }
 
-    /**
-     * 根据考试ID获取考试详情
-     * GET /api/exams/{id}
-     */
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getExamById(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();
@@ -82,10 +73,6 @@ public class ExamController {
         }
     }
 
-    /**
-     * 使用AI生成考试
-     * POST /api/exams/generate
-     */
     @PostMapping("/generate")
     public ResponseEntity<Map<String, Object>> generateExam(@RequestBody Map<String, Object> request) {
         Map<String, Object> response = new HashMap<>();
@@ -103,7 +90,6 @@ public class ExamController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            // 先调用AI生成题目
             Map<String, Object> aiRequest = new HashMap<>();
             aiRequest.put("noteContent", noteContent);
             aiRequest.put("questionCount", questionCount);
@@ -132,10 +118,8 @@ public class ExamController {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> aiQuestions = (List<Map<String, Object>>) aiBody.get("questions");
 
-            // 创建Exam并保存题目（支持examName）
             Exam exam = examService.createExamFromAI(noteId, userId, noteContent, questionCount, difficulty, aiQuestions, examName);
-            
-            // 转换AI返回的题目格式为前端需要的格式
+
             List<Map<String, Object>> formattedQuestions = formatQuestionsForFrontend(exam.getQuestions(), aiQuestions);
 
             response.put("success", true);
@@ -143,17 +127,12 @@ public class ExamController {
             response.put("questions", formattedQuestions);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
             response.put("success", false);
             response.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }
 
-    /**
-     * 删除考试
-     * DELETE /api/exams/{id}?userId=xxx
-     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteExam(
             @PathVariable Long id,
@@ -170,10 +149,6 @@ public class ExamController {
         }
     }
 
-    /**
-     * 获取考试的所有作答记录
-     * GET /api/exams/{examId}/attempts?userId=xxx
-     */
     @GetMapping("/{examId}/attempts")
     public ResponseEntity<Map<String, Object>> getExamAttempts(
             @PathVariable Long examId,
@@ -191,10 +166,6 @@ public class ExamController {
         }
     }
 
-    /**
-     * 保存用户答案
-     * POST /api/exams/{examId}/answers?userId=xxx&attemptId=xxx
-     */
     @PostMapping("/{examId}/answers")
     public ResponseEntity<Map<String, Object>> saveAnswers(
             @PathVariable Long examId,
@@ -223,10 +194,6 @@ public class ExamController {
         }
     }
 
-    /**
-     * 获取作答记录的答案
-     * GET /api/exams/{examId}/answers?userId=xxx&attemptId=xxx
-     */
     @GetMapping("/{examId}/answers")
     public ResponseEntity<Map<String, Object>> getAnswers(
             @PathVariable Long examId,
@@ -245,10 +212,6 @@ public class ExamController {
         }
     }
 
-    /**
-     * 提交考试
-     * POST /api/exams/{examId}/submit?userId=xxx&attemptId=xxx
-     */
     @PostMapping("/{examId}/submit")
     public ResponseEntity<Map<String, Object>> submitExam(
             @PathVariable Long examId,
@@ -269,16 +232,30 @@ public class ExamController {
             response.putAll(result);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
             response.put("success", false);
             response.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }
 
-    /**
-     * 格式化题目为前端需要的格式
-     */
+    @GetMapping("/review")
+    public ResponseEntity<Map<String, Object>> getReviewExams(
+            @RequestParam Long userId,
+            @RequestParam(defaultValue = "5") int limit) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<Map<String, Object>> reviewExams = examService.getReviewExams(userId, limit);
+            response.put("success", true);
+            response.put("data", reviewExams);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            response.put("error", e.getClass().getName());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
     private List<Map<String, Object>> formatQuestionsForFrontend(
             List<Question> questions, List<Map<String, Object>> aiQuestions) {
         List<Map<String, Object>> result = new java.util.ArrayList<>();
@@ -290,8 +267,7 @@ public class ExamController {
             Map<String, Object> formatted = new HashMap<>();
             formatted.put("id", q.getId());
             formatted.put("title", q.getTitle());
-            
-            // 转换类型
+
             String type = q.getType();
             if ("single_choice".equals(type)) {
                 formatted.put("type", "single choice");
@@ -306,8 +282,7 @@ public class ExamController {
             formatted.put("points", q.getPoints());
             formatted.put("correctAnswer", q.getCorrectAnswer());
             formatted.put("explanation", aiQ.getOrDefault("explanation", ""));
-            
-            // 处理选项
+
             if (q.getOptions() != null && !q.getOptions().isEmpty()) {
                 List<Map<String, Object>> options = new java.util.ArrayList<>();
                 for (com.example.demo.entity.Option opt : q.getOptions()) {
@@ -319,7 +294,7 @@ public class ExamController {
                 }
                 formatted.put("options", options);
             } else if ("true-false".equals(formatted.get("type"))) {
-                // 判断题自动生成选项
+                
                 List<Map<String, Object>> options = new java.util.ArrayList<>();
                 options.add(Map.of("value", "True", "label", "A", "text", "True"));
                 options.add(Map.of("value", "False", "label", "B", "text", "False"));

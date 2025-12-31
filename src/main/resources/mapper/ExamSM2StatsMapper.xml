@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.mapper.ExamSM2StatsMapper">
+    
+    <resultMap id="ExamSM2StatsResultMap" type="com.example.demo.entity.ExamSM2Stats">
+        <id property="id" column="id"/>
+        <result property="examId" column="exam_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="easeFactor" column="ease_factor"/>
+        <result property="intervalDays" column="interval_days"/>
+        <result property="lastReviewDate" column="last_review_date"/>
+        <result property="nextReviewDate" column="next_review_date"/>
+    </resultMap>
+    
+    <select id="findByExamIdAndUserId" resultMap="ExamSM2StatsResultMap">
+        SELECT * FROM exam_sm2_stats 
+        WHERE exam_id = #{examId} AND user_id = #{userId}
+        LIMIT 1
+    </select>
+    
+    <select id="findByUserId" resultMap="ExamSM2StatsResultMap">
+        SELECT * FROM exam_sm2_stats 
+        WHERE user_id = #{userId}
+        ORDER BY next_review_date ASC
+    </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO exam_sm2_stats (exam_id, user_id, ease_factor, interval_days, last_review_date, next_review_date)
+        VALUES (#{examId}, #{userId}, #{easeFactor}, #{intervalDays}, #{lastReviewDate}, #{nextReviewDate})
+    </insert>
+    
+    <update id="update">
+        UPDATE exam_sm2_stats
+        SET ease_factor = #{easeFactor},
+            interval_days = #{intervalDays},
+            last_review_date = #{lastReviewDate},
+            next_review_date = #{nextReviewDate}
+        WHERE id = #{id}
+    </update>
+</mapper>
+

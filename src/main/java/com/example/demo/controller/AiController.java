@@ -35,7 +35,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class AiController {
 
     @Autowired
-    private Environment environment;
+    private Environment environment; 
     
     private String deepseekApiKey;
 
@@ -49,31 +49,25 @@ public class AiController {
             this.restTemplate = new RestTemplate();
         }
     }
-    
-    /**
-     * 获取 DeepSeek API Key
-     * 优先级：deepseek.api.key > DEEPSEEK_API_KEY 环境变量
-     */
+
     private String getDeepseekApiKey() {
         if (deepseekApiKey == null) {
-            // 先从 application.properties 或系统属性中读取
+            
             if (environment != null) {
                 deepseekApiKey = environment.getProperty("deepseek.api.key");
-                // 如果为空，再从环境变量中读取
+                
                 if (deepseekApiKey == null || deepseekApiKey.trim().isEmpty()) {
                     deepseekApiKey = environment.getProperty("DEEPSEEK_API_KEY");
                 }
             }
-            
-            // 如果还是为空，尝试从系统属性中读取
+
             if (deepseekApiKey == null || deepseekApiKey.trim().isEmpty()) {
                 deepseekApiKey = System.getProperty("deepseek.api.key");
             }
             if (deepseekApiKey == null || deepseekApiKey.trim().isEmpty()) {
                 deepseekApiKey = System.getProperty("DEEPSEEK_API_KEY");
             }
-            
-            // 最后尝试从系统环境变量中读取
+
             if (deepseekApiKey == null || deepseekApiKey.trim().isEmpty()) {
                 deepseekApiKey = System.getenv("DEEPSEEK_API_KEY");
             }
@@ -84,14 +78,10 @@ public class AiController {
         return deepseekApiKey;
     }
 
-    /**
-     * AI 聊天接口
-     * POST /api/ai/chat
-     */
     @PostMapping("/chat")
     public ResponseEntity<Map<String, Object>> chat(@RequestBody Map<String, Object> request) {
         try {
-            // 检查 API Key 是否配置
+            
             String apiKey = getDeepseekApiKey();
             if (apiKey == null || apiKey.trim().isEmpty()) {
                 Map<String, Object> error = new HashMap<>();
@@ -164,17 +154,11 @@ public class AiController {
         }
     }
 
-    /**
-     * 文件上传 + AI 生成笔记接口
-     * POST /api/ai/generate-note
-     */
     @PostMapping(value = "/generate-note", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> generateNote(
             @RequestParam("files") MultipartFile[] files,
             @RequestParam(value = "noteName", required = false) String noteName,
             @RequestParam(value = "subjectName", required = false) String subjectName) {
-        
-        System.out.println("收到生成笔记请求，文件数量: " + (files != null ? files.length : 0));
         
         try {
             if (files == null || files.length == 0) {
@@ -183,7 +167,6 @@ public class AiController {
                 return ResponseEntity.badRequest().body(error);
             }
 
-            // 读取所有文件内容
             List<String> contentList = new ArrayList<>();
             for (MultipartFile file : files) {
                 try {
@@ -202,7 +185,6 @@ public class AiController {
                 return ResponseEntity.badRequest().body(error);
             }
 
-            // 构建 AI 提示词
             String systemPrompt = buildNoteSystemPrompt();
             String userPrompt = buildNoteUserPrompt(subjectName, noteName, allContent);
 
@@ -260,17 +242,14 @@ public class AiController {
             note.put("subjectName", subjectName != null ? subjectName : "");
             note.put("createdAt", new Date().toInstant().toString());
             result.put("note", note);
-            System.out.println("笔记生成成功");
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            System.err.println("生成笔记失败: " + e.getMessage());
-            e.printStackTrace();
             Map<String, Object> error = new HashMap<>();
             String errorMsg = e.getMessage();
             if (errorMsg == null) {
                 errorMsg = "未知错误";
             }
-            // 如果是数据库相关错误，提供更友好的提示
+            
             if (errorMsg.contains("SQL") || errorMsg.contains("database") || errorMsg.contains("Unknown column")) {
                 error.put("error", "数据库错误：请确保已执行数据库迁移脚本，添加 options 和 explanation 字段到 questions 表。SQL: ALTER TABLE questions ADD COLUMN options TEXT, ADD COLUMN explanation TEXT;");
             } else {
@@ -280,10 +259,6 @@ public class AiController {
         }
     }
 
-    /**
-     * AI 生成测试题接口
-     * POST /api/ai/generate-exam
-     */
     @PostMapping("/generate-exam")
     public ResponseEntity<Map<String, Object>> generateExam(@RequestBody Map<String, Object> request) {
         try {
@@ -350,7 +325,6 @@ public class AiController {
             Map<String, String> message = (Map<String, String>) choices.get(0).get("message");
             String raw = message.get("content");
 
-            // 解析 JSON
             String cleaned = raw.trim();
             if (cleaned.startsWith("```")) {
                 cleaned = cleaned.replaceAll("^```[a-zA-Z]*\\s*", "").replaceAll("```$", "").trim();
@@ -376,14 +350,10 @@ public class AiController {
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", "生成试卷失败：" + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }
 
-    /**
-     * 读取文件内容
-     */
     private String readFileContent(byte[] bytes, String filename) throws IOException {
         if (filename == null) {
             return "";

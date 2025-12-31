@@ -14,6 +14,7 @@
             v-for="group in groups"
             :key="group.id"
             class="group-card"
+            @click="goToGroupDetail(group.id)"
           >
             <div class="group-card-header">
               <h4 class="group-name">{{ group.name }}</h4>
@@ -43,7 +44,6 @@
       </button>
     </div>
 
-    <!-- 创建群组弹窗 -->
     <div v-if="showCreateModal" class="modal-overlay">
       <div class="modal">
         <div class="modal-header">
@@ -52,7 +52,7 @@
         </div>
 
         <div class="modal-body">
-          <!-- 群组名称 -->
+          
           <div class="form-item">
             <label class="form-label">Group name</label>
             <input
@@ -63,7 +63,6 @@
             />
           </div>
 
-          <!-- 搜索并添加成员 -->
           <div class="form-item">
             <label class="form-label">Add member (search by username)</label>
             <div class="user-search-row">
@@ -83,7 +82,6 @@
               </button>
             </div>
 
-            <!-- 搜索结果列表 -->
             <div v-if="userSearchResults.length" class="user-list">
               <div
                 v-for="user in userSearchResults"
@@ -99,7 +97,6 @@
               </div>
             </div>
 
-            <!-- 已选择成员 -->
             <div v-if="selectedUsers.length" class="selected-users">
               <div
                 v-for="user in selectedUsers"
@@ -130,7 +127,6 @@
       </div>
     </div>
 
-    <!-- 加入群组弹窗 -->
     <div v-if="showJoinModal" class="modal-overlay">
       <div class="modal">
         <div class="modal-header">
@@ -161,7 +157,6 @@
 
           <p class="hint">Search by the group name and click "Join" after finding it.</p>
 
-          <!-- 查询结果 -->
           <div v-if="searchedGroup" class="group-result-card">
             <div>
               <div class="group-name">{{ searchedGroup.name }}</div>
@@ -191,9 +186,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../utils/api'
 
-// 获取当前用户ID
+const router = useRouter()
+
 const getCurrentUserId = () => {
   const savedUser = localStorage.getItem('auth_user')
   if (savedUser) {
@@ -211,7 +208,6 @@ const currentUserId = ref(null)
 const groups = ref([])
 const loadingGroups = ref(false)
 
-// 加载用户群组列表
 const loadGroups = async () => {
   const userId = getCurrentUserId()
   if (!userId) {
@@ -235,7 +231,6 @@ onMounted(() => {
   loadGroups()
 })
 
-// 创建群组弹窗状态
 const showCreateModal = ref(false)
 const groupName = ref('')
 const userSearchKeyword = ref('')
@@ -244,7 +239,7 @@ const selectedUsers = ref([])
 const isSearching = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
-// 加入群组弹窗状态
+
 const showJoinModal = ref(false)
 const groupNameToJoin = ref('')
 const searchedGroup = ref(null)
@@ -271,7 +266,6 @@ const resetCreateForm = () => {
   isSubmitting.value = false
 }
 
-// 搜索用户
 const searchUsers = async () => {
   const keyword = userSearchKeyword.value.trim()
   if (!keyword) {
@@ -318,7 +312,6 @@ const removeUser = (userId) => {
   selectedUsers.value = selectedUsers.value.filter((u) => u.id !== userId)
 }
 
-// 提交创建群组
 const submitCreateGroup = async () => {
   if (!groupName.value.trim()) {
     errorMessage.value = 'Please enter group name'
@@ -344,7 +337,6 @@ const submitCreateGroup = async () => {
       memberIds: selectedUsers.value.map((u) => u.id)
     }
 
-    // 创建群组向后端发送请求，传递 userId 作为 creatorId
     const res = await fetch(`/api/groups?userId=${userId}`, {
       method: 'POST',
       headers: {
@@ -358,7 +350,6 @@ const submitCreateGroup = async () => {
       throw new Error(data.message || 'Failed to create the group')
     }
 
-    // 成功后关闭弹窗并刷新群组列表
     closeCreateGroup()
     alert('Group created successfully!')
     loadGroups()
@@ -370,7 +361,6 @@ const submitCreateGroup = async () => {
   }
 }
 
-// 打开/关闭加入群组弹窗
 const openJoinGroup = () => {
   resetJoinForm()
   showJoinModal.value = true
@@ -388,7 +378,6 @@ const resetJoinForm = () => {
   isJoining.value = false
 }
 
-// 根据群组名称查询
 const searchGroupByName = async () => {
   const name = groupNameToJoin.value.trim()
   if (!name) {
@@ -422,7 +411,6 @@ const searchGroupByName = async () => {
   }
 }
 
-// 加入群组
 const joinGroup = async () => {
   if (!searchedGroup.value?.id) {
     joinError.value = 'Please first search for the target group.'
@@ -456,7 +444,6 @@ const joinGroup = async () => {
       throw new Error(data.message || 'Failed to join the group')
     }
 
-    // 成功后关闭弹窗并刷新群组列表
     closeJoinGroup()
     alert('Successfully joined the group!')
     loadGroups()
@@ -466,6 +453,10 @@ const joinGroup = async () => {
   } finally {
     isJoining.value = false
   }
+}
+
+const goToGroupDetail = (groupId) => {
+  router.push(`/group/${groupId}`)
 }
 </script>
 
@@ -477,10 +468,10 @@ const joinGroup = async () => {
 }
 
 .groups-display {
-  background-color: #fff;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(33, 150, 243, 0.1);
   min-height: 400px;
 }
 
@@ -500,10 +491,14 @@ const joinGroup = async () => {
 }
 
 .groups-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 16px;
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1976D2 0%, #2196F3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 20px;
+  letter-spacing: -0.3px;
 }
 
 .groups-grid {
@@ -513,17 +508,20 @@ const joinGroup = async () => {
 }
 
 .group-card {
-  background-color: #f8f9fa;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 16px;
-  transition: all 0.2s;
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  border: 2px solid rgba(144, 202, 249, 0.8);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.08);
+  position: relative;
+  overflow: hidden;
 }
 
 .group-card:hover {
-  border-color: #1976d2;
-  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
+  border-color: #2196F3;
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.25), 0 0 0 3px rgba(33, 150, 243, 0.15);
   transform: translateY(-2px);
 }
 
@@ -535,19 +533,20 @@ const joinGroup = async () => {
 }
 
 .group-name {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: #1565C0;
   margin: 0;
 }
 
 .group-badge {
-  background-color: #1976d2;
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
   color: white;
   font-size: 11px;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(33, 150, 243, 0.3);
 }
 
 .group-card-info {
@@ -579,36 +578,42 @@ const joinGroup = async () => {
 .action-btn {
   flex: 1;
   padding: 12px 24px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #fff;
+  border: 2px solid rgba(187, 222, 251, 0.8);
+  border-radius: 10px;
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
 .action-btn:hover {
-  background-color: #f5f5f5;
-  border-color: #1976d2;
-  color: #1976d2;
+  background: linear-gradient(to bottom, #E3F2FD 0%, #BBDEFB 100%);
+  border-color: #64B5F6;
+  color: #1565C0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
 }
 
 .add-group-btn {
-  background-color: #1976d2;
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
   color: white;
-  border-color: #1976d2;
+  border-color: #2196F3;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
 }
 
 .add-group-btn:hover {
-  background-color: #1565c0;
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
   color: white;
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.4);
+  transform: translateY(-2px);
 }
 
-/* 弹窗样式 */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: rgba(33, 150, 243, 0.2);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -618,11 +623,12 @@ const joinGroup = async () => {
 .modal {
   width: 520px;
   max-width: 90%;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(33, 150, 243, 0.25);
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(187, 222, 251, 0.6);
 }
 
 .modal-header {
@@ -670,10 +676,19 @@ const joinGroup = async () => {
 
 .form-input {
   width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 10px 14px;
+  border: 2px solid rgba(187, 222, 251, 0.6);
+  border-radius: 10px;
   font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #64B5F6;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.1);
+  background: #FFFFFF;
 }
 
 .user-search-row {
@@ -682,13 +697,21 @@ const joinGroup = async () => {
 }
 
 .small-btn {
-  padding: 8px 14px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 8px;
   border: none;
-  background-color: #1976d2;
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
   color: #fff;
   font-size: 13px;
   cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(33, 150, 243, 0.3);
+}
+
+.small-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+  box-shadow: 0 4px 10px rgba(33, 150, 243, 0.4);
+  transform: translateY(-1px);
 }
 
 .small-btn:disabled {
@@ -713,17 +736,21 @@ const joinGroup = async () => {
 .user-item {
   display: flex;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 10px 14px;
   font-size: 14px;
   cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 6px;
+  margin: 4px;
 }
 
 .user-item:hover {
-  background-color: #f5f5f5;
+  background: linear-gradient(to right, rgba(227, 242, 253, 0.6) 0%, rgba(187, 222, 251, 0.3) 100%);
 }
 
 .user-item.selected {
-  background-color: #e3f2fd;
+  background: linear-gradient(to right, #E3F2FD 0%, rgba(187, 222, 251, 0.4) 100%);
+  border: 1px solid rgba(144, 202, 249, 0.6);
 }
 
 .user-tag {
@@ -742,11 +769,14 @@ const joinGroup = async () => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  background-color: #e3f2fd;
-  color: #1976d2;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+  color: #1565C0;
   border-radius: 999px;
   font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(33, 150, 243, 0.15);
+  border: 1px solid rgba(144, 202, 249, 0.4);
 }
 
 .remove-chip {
@@ -760,38 +790,59 @@ const joinGroup = async () => {
 }
 
 .primary-btn {
-  padding: 8px 16px;
-  background-color: #1976d2;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.primary-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.4);
+  transform: translateY(-1px);
 }
 
 .primary-btn:disabled {
-  background-color: #90caf9;
+  background: linear-gradient(135deg, #90CAF9 0%, #BBDEFB 100%);
   cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .secondary-btn {
-  padding: 8px 16px;
-  background-color: #f5f5f5;
-  color: #333;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 10px 20px;
+  background: linear-gradient(to bottom, #FFFFFF 0%, #F8FBFF 100%);
+  color: #546E7A;
+  border: 2px solid rgba(187, 222, 251, 0.8);
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.secondary-btn:hover {
+  background: linear-gradient(to bottom, #E3F2FD 0%, #BBDEFB 100%);
+  border-color: #64B5F6;
+  color: #1565C0;
+  transform: translateY(-1px);
 }
 
 .group-result-card {
   margin-top: 12px;
-  padding: 12px 14px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  padding: 16px 20px;
+  border: 2px solid rgba(187, 222, 251, 0.6);
+  border-radius: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9) 0%, rgba(248, 251, 255, 0.6) 100%);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
 }
 
 .group-name {

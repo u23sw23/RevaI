@@ -3,7 +3,6 @@
     <h2 class="page-title">Subjects / Notes</h2>
     <p class="page-subtitle">Select a subject, then choose one of its notes to view details.</p>
 
-    <!-- 科目列表 -->
     <div class="subjects-grid" v-if="!selectedSubject">
       <div
         class="subject-card"
@@ -34,7 +33,6 @@
       </div>
     </div>
 
-    <!-- 笔记列表（选中某科目后） -->
     <div v-else class="notes-panel">
       <div class="notes-header">
         <div>
@@ -68,7 +66,6 @@
       </div>
     </div>
 
-    <!-- Upload / create notes (visible only when a subject is selected) -->
     <div v-if="selectedSubject" class="create-section">
       <div
         class="drop-zone"
@@ -100,8 +97,7 @@
               {{ isGenerating ? 'Generating...' : 'Generate Notes with AI' }}
             </button>
           </div>
-          
-          <!-- 生成中的动态提示 -->
+
           <div v-if="isGenerating" class="generating-status">
             <div class="generating-spinner"></div>
             <div class="generating-text">
@@ -135,7 +131,6 @@
     </div>
   </div>
 
-  <!-- Subject create / rename dialog -->
   <div
     v-if="showSubjectDialog"
     class="modal-mask"
@@ -180,9 +175,8 @@ const subjects = ref(subjectList.map((s) => ({ ...s })))
 const selectedSubject = ref(null)
 const activeMenuId = ref(null)
 
-// 弹窗状态
 const showSubjectDialog = ref(false)
-const dialogMode = ref('create') // 'create' | 'edit'
+const dialogMode = ref('create') 
 const dialogName = ref('')
 const dialogSubject = ref(null)
 
@@ -207,7 +201,7 @@ const loadSubjects = () => {
   } catch (e) {
     console.warn('Failed to load subjects from localStorage', e)
   }
-  // fallback: use default seed data
+  
   subjects.value = subjectList.map((s) => ({ ...s }))
 }
 
@@ -291,7 +285,6 @@ const goToNote = (noteId) => {
   router.push(`/repositories/${noteId}`)
 }
 
-// drag & drop upload state and handlers
 const isDragging = ref(false)
 const selectedFiles = ref([])
 const noteName = ref('')
@@ -335,7 +328,7 @@ const submitToAI = async () => {
   generatingStatus.value = 'Uploading files...'
 
   try {
-    // 构建 FormData
+    
     const formData = new FormData()
     selectedFiles.value.forEach((file) => {
       formData.append('files', file)
@@ -344,8 +337,7 @@ const submitToAI = async () => {
     formData.append('subjectName', selectedSubject.value?.name || '')
 
     console.log('📤 Uploading files and generating notes...')
-    
-    // 模拟进度提示
+
     setTimeout(() => {
       if (isGenerating.value) generatingStatus.value = 'Processing your files...'
     }, 1500)
@@ -367,7 +359,6 @@ const submitToAI = async () => {
       body: formData,
     })
 
-    // 尝试解析为 JSON；如果不是 JSON，则读取原始文本
     if (!response.ok) {
       const text = await response.text()
       let errMsg = text
@@ -375,7 +366,7 @@ const submitToAI = async () => {
         const errorData = JSON.parse(text)
         errMsg = errorData.error || JSON.stringify(errorData)
       } catch (e) {
-        // 不是 JSON，就直接用文本
+        
       }
       throw new Error(errMsg || 'Generation failed')
     }
@@ -383,7 +374,6 @@ const submitToAI = async () => {
     const data = await response.json()
     console.log('✅ Note generated successfully:', data)
 
-    // 将生成的笔记添加到当前科目
     if (data.note && selectedSubject.value) {
       const newNote = {
         id: Date.now().toString(),
@@ -393,12 +383,11 @@ const submitToAI = async () => {
       }
       selectedSubject.value.notes.push(newNote)
       generatedNote.value = newNote
-      
-      // 清空表单
+
       selectedFiles.value = []
       noteName.value = ''
       
-      alert('🎉 Notes generated successfully! Added to current subject.')
+      alert('Notes generated successfully')
       saveSubjects()
     }
   } catch (error) {
@@ -414,7 +403,6 @@ const removeFile = (index) => {
   selectedFiles.value.splice(index, 1)
 }
 
-// 删除笔记
 const deleteNote = (noteId) => {
   if (!confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
     return
@@ -672,7 +660,6 @@ const deleteNote = (noteId) => {
   color: #e53935;
 }
 
-/* 生成中的动态提示 */
 .generating-status {
   display: flex;
   align-items: center;
@@ -735,14 +722,12 @@ const deleteNote = (noteId) => {
   }
 }
 
-/* 让科目卡片在小屏也保持舒适间距 */
 @media (max-width: 768px) {
   .subjects-grid {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
 
-/* 上传笔记区域样式 */
 .create-section {
   background-color: #fff;
   padding: 24px;
@@ -883,7 +868,6 @@ const deleteNote = (noteId) => {
   font-weight: 300;
 }
 
-/* 弹窗样式 */
 .modal-mask {
   position: fixed;
   inset: 0;
@@ -955,7 +939,6 @@ const deleteNote = (noteId) => {
   border-color: #bbb;
 }
 
-/* 浮动创建按钮 */
 .fab {
   position: fixed;
   right: 32px;

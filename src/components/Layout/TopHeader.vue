@@ -1,6 +1,6 @@
 <template>
   <header class="top-header">
-    <!-- 左侧：搜索框 -->
+    
     <div class="header-left">
       <div class="search-wrapper">
         <input
@@ -16,7 +16,6 @@
       </div>
     </div>
 
-    <!-- 中间：仓库下拉选择 -->
     <div class="header-center">
       <select
         class="repo-select"
@@ -34,21 +33,18 @@
       </select>
     </div>
 
-    <!-- 右侧：登录/注册 或 头像入口 -->
     <div class="header-right">
-      <!-- 已登录：显示头像，点击进入 Profile -->
+      
       <div v-if="isLoggedIn" class="avatar" @click="goToProfile">
         {{ userInitial }}
       </div>
 
-      <!-- 未登录：显示 Login / Register 按钮 -->
       <div v-else class="auth-buttons">
         <button class="auth-btn" @click="openLoginModal">Login</button>
         <button class="auth-btn primary" @click="openRegisterModal">Register</button>
       </div>
     </div>
 
-    <!-- 登录弹窗 -->
     <div v-if="showLoginModal" class="modal-overlay">
       <div class="modal">
         <div class="modal-header">
@@ -98,7 +94,6 @@
       </div>
     </div>
 
-    <!-- 注册弹窗 -->
     <div v-if="showRegisterModal" class="modal-overlay">
       <div class="modal">
         <div class="modal-header">
@@ -172,12 +167,6 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
-/**
- * 父组件可以给 TopHeader 传入：
- * - repositories：仓库列表 [{ id, name }, ...]
- * - currentRepoId：当前选中的仓库 id
- * - userName：当前用户名称（用于头像上的首字母）
- */
 const props = defineProps({
   repositories: {
     type: Array,
@@ -193,18 +182,10 @@ const props = defineProps({
   }
 })
 
-/**
- * 向父组件发送事件：
- * - search：用户按下回车进行搜索时
- * - update:currentRepoId：用户切换仓库时
- * - auth-success：登录或注册成功时，将用户信息通知父组件
- */
 const emit = defineEmits(['search', 'update:currentRepoId', 'auth-success'])
 
-// 搜索关键字（双向绑定到输入框）
 const searchKeyword = ref('')
 
-// 当前选择的仓库 id（和父组件的 currentRepoId 对齐）
 const selectedRepoId = ref(props.currentRepoId ?? '')
 
 watch(
@@ -214,10 +195,8 @@ watch(
   }
 )
 
-// 当前登录用户名（本地维护一份，避免直接修改 props）
 const currentUserName = ref(props.userName)
 
-// 头像上显示的首字母
 const userInitial = computed(() => {
   if (!currentUserName.value) return 'U'
   return currentUserName.value.trim().charAt(0).toUpperCase()
@@ -225,10 +204,8 @@ const userInitial = computed(() => {
 
 const router = useRouter()
 
-// 登录状态（简单本地状态；实际项目中可改为从全局 store 或 token 推导）
 const isLoggedIn = ref(false)
 
-// 登录/注册弹窗相关状态
 const showLoginModal = ref(false)
 const showRegisterModal = ref(false)
 const authLoading = ref(false)
@@ -248,7 +225,6 @@ const loginShowPassword = ref(false)
 const registerShowPassword = ref(false)
 const registerShowConfirm = ref(false)
 
-// 初始化：根据本地存储还原登录状态
 onMounted(() => {
   const savedUser = localStorage.getItem('auth_user')
   if (savedUser) {
@@ -256,32 +232,28 @@ onMounted(() => {
     try {
       const user = JSON.parse(savedUser)
       currentUserName.value = user.name || 'User'
-      // 通知父组件当前用户（便于 Profile 等页面初始化）
+      
       emit('auth-success', user)
     } catch (e) {
-      // ignore parse error
+      
     }
   }
 })
 
-// 点击头像，跳转到个人信息页
 const goToProfile = () => {
   router.push('/profile')
 }
 
-// 回车触发搜索，把关键词发给父组件
 const handleSearch = () => {
   const keyword = searchKeyword.value.trim()
   emit('search', keyword)
 }
 
-// 切换仓库，把新的仓库 id 通知给父组件
 const handleRepoChange = () => {
   const value = selectedRepoId.value || null
   emit('update:currentRepoId', value)
 }
 
-// 打开/关闭登录弹窗
 const openLoginModal = () => {
   authError.value = ''
   authLoading.value = false
@@ -297,7 +269,6 @@ const closeLoginModal = () => {
   showLoginModal.value = false
 }
 
-// 打开/关闭注册弹窗
 const openRegisterModal = () => {
   authError.value = ''
   authLoading.value = false
@@ -315,7 +286,6 @@ const closeRegisterModal = () => {
   showRegisterModal.value = false
 }
 
-// 登录提交：调用后端 /api/auth/login
 const submitLogin = async () => {
   if (!loginForm.value.username || !loginForm.value.password) {
     authError.value = 'Username and password are required'
@@ -342,11 +312,11 @@ const submitLogin = async () => {
     }
 
     const data = await res.json()
-    // 假设后端返回 { user: {...}, token: '...' }
+    
     const user = data.user || { name: loginForm.value.username }
 
     isLoggedIn.value = true
-    // 登录成功后更新本地用户名并持久化（实际项目中应同步到全局状态）
+    
     currentUserName.value = user.name
     localStorage.setItem('auth_username', currentUserName.value)
     localStorage.setItem('auth_user', JSON.stringify(user))
@@ -362,7 +332,6 @@ const submitLogin = async () => {
   }
 }
 
-// 注册提交：调用后端 /api/auth/register
 const submitRegister = async () => {
   if (!registerForm.value.username || !registerForm.value.password || !registerForm.value.confirmPassword) {
     authError.value = 'Please fill in all fields'
@@ -393,7 +362,7 @@ const submitRegister = async () => {
     }
 
     const data = await res.json()
-    // 假设后端返回 { user: {...}, token: '...' }，并自动登录
+    
     const user = data.user || { name: registerForm.value.username }
 
     isLoggedIn.value = true
@@ -527,7 +496,6 @@ const submitRegister = async () => {
   color: white;
 }
 
-/* 弹窗通用样式，和 Group.vue 中的风格保持一致 */
 .modal-overlay {
   position: fixed;
   inset: 0;

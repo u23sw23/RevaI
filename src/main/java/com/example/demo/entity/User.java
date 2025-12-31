@@ -2,9 +2,6 @@ package com.example.demo.entity;
 
 import java.time.LocalDateTime;
 
-/**
- * 用户实体类
- */
 public class User {
     private Long id;
     private String username;
@@ -14,12 +11,10 @@ public class User {
     private String avatar;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
-    
-    // 统计字段（不存储在数据库中，通过查询计算）
+
     private Integer repositoryCount;
     private Integer groupCount;
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

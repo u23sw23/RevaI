@@ -29,16 +29,26 @@ public class SubjectController {
     @GetMapping  
     public ResponseEntity<Map<String, Object>> getAllSubjects(
             @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) String visibility) {
+            @RequestParam(required = false) String visibility,
+            @RequestParam(required = false) String separated) {
         Map<String, Object> response = new HashMap<>();
         try {
-            List<Subject> subjects;  //这行代码声明了一个List<Subject>类型的变量subjects，用于存储科目列表。
-            if ("public".equals(visibility)) { //这行代码检查visibility参数是否等于"public"。
-                // 获取所有公开的科目
+            List<Subject> subjects;  
+            if ("public".equals(visibility)) { 
+                
                 subjects = subjectService.getAllPublicSubjects();
             } else if (userId != null) {
-                // 获取指定用户的科目
-                subjects = subjectService.getAllSubjects(userId);
+                
+                if ("true".equals(separated)) {
+                    
+                    Map<String, List<Subject>> separatedSubjects = subjectService.getAllSubjectsSeparated(userId);
+                    response.put("success", true);
+                    response.put("data", separatedSubjects);
+                    return ResponseEntity.ok(response);
+                } else {
+                    
+                    subjects = subjectService.getAllSubjects(userId);
+                }
             } else {
                 response.put("success", false);
                 response.put("message", "需要提供userId或visibility=public参数");
@@ -48,7 +58,6 @@ public class SubjectController {
             response.put("data", subjects);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace(); // 打印堆栈跟踪以便调试
             response.put("success", false);
             response.put("message", "获取科目列表失败: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
@@ -108,6 +117,39 @@ public class SubjectController {
         try {
             subjectService.deleteSubject(id);
             response.put("success", true);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/{id}/clone")
+    public ResponseEntity<Map<String, Object>> cloneSubject(
+            @PathVariable Long id,
+            @RequestParam Long userId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Subject cloned = subjectService.cloneSubject(id, userId);
+            response.put("success", true);
+            response.put("data", cloned);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchPublicSubjects(
+            @RequestParam String keyword) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<Subject> subjects = subjectService.searchPublicSubjects(keyword);
+            response.put("success", true);
+            response.put("data", subjects);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);

@@ -26,7 +26,6 @@ import { useRouter } from 'vue-router'
 import { marked } from 'marked'
 import { findNoteById } from '../data/notes'
 
-// 配置 marked
 marked.setOptions({
   breaks: true,
   gfm: true,
@@ -44,7 +43,6 @@ const props = defineProps({
 const { subject, note } = findNoteById(props.id)
 const repositoryName = computed(() => note?.title || props.id)
 
-// 渲染 Markdown 内容
 const renderedContent = computed(() => {
   if (!note?.content) return ''
   try {
@@ -113,7 +111,6 @@ const backToList = () => {
   border: 1px solid #e8e8e8;
 }
 
-/* Markdown 渲染样式 */
 .markdown-body :deep(h1) {
   font-size: 1.8em;
   font-weight: 700;

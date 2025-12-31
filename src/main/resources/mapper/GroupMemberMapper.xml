@@ -13,6 +13,10 @@
         SELECT user_id FROM group_members WHERE group_id = #{groupId}
     </select>
     
+    <select id="findGroupIdsByUserId" resultType="java.lang.Long">
+        SELECT group_id FROM group_members WHERE user_id = #{userId}
+    </select>
+    
     <select id="findByGroupIdAndUserId" resultMap="GroupMemberResultMap">
         SELECT * FROM group_members 
         WHERE group_id = #{groupId} AND user_id = #{userId}

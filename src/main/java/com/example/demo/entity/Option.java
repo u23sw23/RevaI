@@ -1,12 +1,9 @@
 package com.example.demo.entity;
 
-/**
- * 选项实体类
- */
 public class Option {
-    private String value; // 选项值，如 "A", "B", "C"
-    private String label; // 选项标签，如 "A", "B", "C"
-    private String text; // 选项文本内容
+    private String value; 
+    private String label; 
+    private String text; 
 
     public Option() {
     }
@@ -17,7 +14,6 @@ public class Option {
         this.text = text;
     }
 
-    // Getters and Setters
     public String getValue() {
         return value;
     }

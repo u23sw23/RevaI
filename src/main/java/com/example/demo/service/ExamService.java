@@ -18,5 +18,6 @@ public interface ExamService {
     List<Map<String, Object>> getExamAttempts(Long examId, Long userId);
     Map<String, Object> submitExam(Long examId, Long userId, Map<Long, String> answers, Long attemptId);
     void deleteExam(Long examId, Long userId);
+    List<Map<String, Object>> getReviewExams(Long userId, int limit);
 }
 

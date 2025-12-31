@@ -9,6 +9,7 @@ import java.util.List;
 @Mapper
 public interface GroupMemberMapper {
     List<Long> findUserIdsByGroupId(Long groupId);
+    List<Long> findGroupIdsByUserId(Long userId);
     GroupMember findByGroupIdAndUserId(@Param("groupId") Long groupId, @Param("userId") Long userId);
     int insert(GroupMember groupMember);
     int delete(@Param("groupId") Long groupId, @Param("userId") Long userId);

@@ -1,10 +1,5 @@
--- 为 questions 表添加 options 和 explanation 字段
--- 使用方法：在 MySQL 客户端中执行此 SQL 脚本
 
--- 检查字段是否存在，如果不存在则添加（MySQL 8.0+）
--- 如果使用 MySQL 5.7，请使用下面的简单版本
 
--- MySQL 8.0+ 版本（推荐）
 SET @dbname = DATABASE();
 SET @tablename = 'questions';
 SET @columnname1 = 'options';
@@ -38,9 +33,4 @@ SET @preparedStatement = (SELECT IF(
 PREPARE alterIfNotExists FROM @preparedStatement;
 EXECUTE alterIfNotExists;
 DEALLOCATE PREPARE alterIfNotExists;
-
--- MySQL 5.7 简单版本（如果上面的复杂版本不工作，使用这个）
--- ALTER TABLE questions 
--- ADD COLUMN options TEXT COMMENT 'JSON格式存储选项',
--- ADD COLUMN explanation TEXT COMMENT '题目解析';
 
